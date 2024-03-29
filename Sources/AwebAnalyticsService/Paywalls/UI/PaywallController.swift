@@ -10,17 +10,16 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
     
     public var apphudProducts: [ApphudSDK.ApphudProduct] = []
     public var dismissed: (() -> Void)?
+    public var logOpen: (() -> Void)?
+    public var logClose: (() -> Void)?
     
     let overlayView = LoaderOverlayView()
-    
     let purchaseService: any PurchaseServiceProtocol
     
     init(
-        purchaseService: PurchaseService,
-        dismissed: ( () -> Void)? = nil
+        purchaseService: PurchaseService
     ) {
         self.purchaseService = purchaseService
-        self.dismissed = dismissed
         
         super.init(nibName: nil, bundle: nil)
     }
@@ -48,6 +47,8 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
         if let navigationController {
             navigationController.setNavigationBarHidden(true, animated: false)
         }
+        
+        logOpen?()
     }
     
     
@@ -74,45 +75,32 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
         purchaseService.restore { [weak self] restored in
             self?.overlayView.isHidden = true
             if restored {
-                
                 self?.dismiss()
             } else {
                 self?.presentNoPurchasesToRestoreAlert()
             }
         }
-//        Current.purchaseService().restore { [weak self] restored in
-//            self?.overlayView.isHidden = true
-//            if restored {
-//                self?.dismiss()
-//                Current.subscriptionService().isSubActive = true
-//            } else {
-//                self?.presentNoPurchasesToRestoreAlert()
-//            }
-//        }
     }
     
     public func purchase(_ iap: IAPProtocol) {
-//        Current.analyticsService().log(e: PaywallCheckoutStartedEvent(paywallID: paywallView.appHudPaywallID.rawValue))
         self.overlayView.isHidden = false
         if let apphudProduct = apphudProducts.first(where: { $0.productId == iap.productID }) {
-//            Current.purchaseService().purchase(apphudProduct) { [weak self] result in
-//                guard let self = self else { return }
-//                self.overlayView.isHidden = true
-//                
-//                switch result {
-//                case .cancel:
-//                    Current.analyticsService().log(
-//                        e: PaywallCheckoutCancelledEvent(
-//                            paywallID: self.paywallView.appHudPaywallID.rawValue
-//                        )
-//                    )
-//                case .fail:
-//                    self.presentCannotPurchaseAlert()
-//                case .success:
-//                    self.dismiss()
-//                    Current.subscriptionService().isSubActive = true
-//                }
-//            }
+            purchaseService.purchase(
+                apphudProduct,
+                paywallID: paywallView.appHudPaywallID.rawValue
+            ) { [weak self] result in
+                guard let self = self else { return }
+                self.overlayView.isHidden = true
+                
+                switch result {
+                case .cancel:
+                    break
+                case .fail:
+                    self.presentCannotPurchaseAlert()
+                case .success:
+                    self.dismiss()
+                }
+            }
         } else {
             self.presentCannotPurchaseAlert()
             self.overlayView.isHidden = true
@@ -128,7 +116,7 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
     }
     
     public func dismiss() {
-//        Current.analyticsService().log(e: PaywallClosedEvent(paywallID: paywallView.appHudPaywallID.rawValue))
+        logClose?()
         dismissed?()
     }
     

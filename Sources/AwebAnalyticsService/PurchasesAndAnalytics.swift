@@ -8,6 +8,7 @@ public class PurchasesAndAnalytics {
     lazy var purchases = PurchaseService()
     lazy var paywalls = PaywallService()
     
+    /// Set this value before accessing the `analytics`
     public var apphudStarted: (() -> Void)!
     
     private init() {

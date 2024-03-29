@@ -10,20 +10,20 @@ import BranchSDK
 import AdSupport
 import UserNotifications
 
-//public protocol AnalyticsServiceProtocol: AnyObject {
-//    func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
-//    func applicationDidBecomeActive(_ application: UIApplication)
-//    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool
-//    func application(_application: UIApplication, continue userActivity: NSUserActivity) -> Bool
-//    func application(_application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) -> Void
-//    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data)
-//    
-//    func registerForNotifications()
-//    func log(e: EventProtocol)
-//    var apphudStarted: (() -> Void)? { get set }
-//}
+public protocol AnalyticsServiceProtocol: AnyObject {
+    func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
+    func applicationDidBecomeActive(_ application: UIApplication)
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool
+    func application(_application: UIApplication, continue userActivity: NSUserActivity) -> Bool
+    func application(_application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) -> Void
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data)
+    
+    func registerForNotifications()
+    func log(e: EventProtocol)
+    var apphudStarted: () -> Void { get set }
+}
 
-public class AnalyticsService: NSObject {
+public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
     private let firebase = Analytics.self
     private let branch = Branch.getInstance()
@@ -32,18 +32,20 @@ public class AnalyticsService: NSObject {
     
     let userID = AppEvents.shared.anonymousID
     
-    let apphudStarted: () -> Void
-    let setPlacements: ([ApphudPlacement]) -> Void
+    public var apphudStarted: () -> Void
+    let placementsDidLoad: ([ApphudPlacement]) -> Void
+    
+    var placements = [ApphudPlacement]()
     
     init(
         apphudStarted: @escaping () -> Void,
-        setPlacements: @escaping ([ApphudPlacement]) -> Void
+        placementsDidLoad: @escaping ([ApphudPlacement]) -> Void
     ) {
         self.apphudStarted = apphudStarted
-        self.setPlacements = setPlacements
+        self.placementsDidLoad = placementsDidLoad
     }
     
-    @MainActor func didFinishLaunchingWithOptions(
+    @MainActor public func didFinishLaunchingWithOptions(
         application: UIApplication,
         options: [UIApplication.LaunchOptionsKey: Any]?
     ) {
@@ -57,7 +59,8 @@ public class AnalyticsService: NSObject {
         apphud.start(apiKey: PurchasesAndAnalytics.Keys.apphudKey) { user in
             self.apphud.placementsDidLoadCallback { placements in
                 self.logPlacements(placements)
-                self.setPlacements(placements)
+                self.placements = placements
+                self.placementsDidLoad(placements)
                 self.apphudStarted()
             }
         }
@@ -99,7 +102,7 @@ public class AnalyticsService: NSObject {
         Log.printLog(l: .debug, str: "\n\n\n\(str)\n\n")
     }
     
-    func registerForNotifications() {
+    public func registerForNotifications() {
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (granted, error) in
             // handle if needed
@@ -107,7 +110,7 @@ public class AnalyticsService: NSObject {
         UIApplication.shared.registerForRemoteNotifications()
     }
     
-    func application(
+    public func application(
         _ app: UIApplication,
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any]
@@ -121,11 +124,14 @@ public class AnalyticsService: NSObject {
         )
     }
 
-    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    public func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
         apphud.submitPushNotificationsToken(token: deviceToken, callback: nil)
     }
     
-    func applicationDidBecomeActive(_ application: UIApplication) {
+    public func applicationDidBecomeActive(_ application: UIApplication) {
         switch ATTrackingManager.trackingAuthorizationStatus {
         case .notDetermined:
             ATTrackingManager.requestTrackingAuthorization { status in
@@ -152,36 +158,40 @@ public class AnalyticsService: NSObject {
         }
     }
     
-    public func application(_application: UIApplication, continue userActivity: NSUserActivity) -> Bool {
+    public func application(
+        _application: UIApplication,
+        continue userActivity: NSUserActivity
+    ) -> Bool {
         branch.continue(userActivity)
         return true
     }
     
-    @MainActor func application(_application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) {
+    @MainActor public func application(
+        _application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable : Any]
+    ) {
         apphud.handlePushNotification(apsInfo: userInfo)
         branch.handlePushNotification(userInfo)
     }
     
-    func log(e: EventProtocol) {
+    public func log(e: EventProtocol) {
     
         Log.printLog(l: .analytics, str: e.name + " \(e.params)")
         
         if let paywallOpenEvent = e as? PaywallOpenEvent {
-            Task {
-                let paywalls = await apphud.placements().compactMap { $0.paywall }
-                if let p = paywalls.first(where: { $0.identifier == paywallOpenEvent.paywallID }) {
-                    apphud.paywallShown(p)
-                }
+            if let paywall = placements
+                .compactMap({ $0.paywall })
+                .first(where: { $0.identifier == paywallOpenEvent.paywallID }) {
+                apphud.paywallShown(paywall)
             }
             
             return
         }
         if let paywallClosedEvent = e as? PaywallClosedEvent {
-            Task {
-                let paywalls = await apphud.placements().compactMap { $0.paywall }
-                if let p = paywalls.first(where: { $0.identifier == paywallClosedEvent.paywallID }) {
-                    apphud.paywallClosed(p)
-                }
+            if let paywall = placements
+                .compactMap({ $0.paywall })
+                .first(where: { $0.identifier == paywallClosedEvent.paywallID }) {
+                apphud.paywallClosed(paywall)
             }
             return
         }

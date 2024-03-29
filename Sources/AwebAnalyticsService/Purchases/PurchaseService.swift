@@ -4,7 +4,7 @@ import ApphudSDK
 import Combine
 
 public protocol PurchaseServiceProtocol {
-    func purchase(_ iap: ApphudProduct, _ completion: @escaping (PurchaseResult) -> Void)
+    func purchase(_ iap: ApphudProduct, paywallID: String, _ completion: @escaping (PurchaseResult) -> Void)
     func restore(_ completion: @escaping (Bool) -> Void)
     
     var isSubActive: Bool { get set }
@@ -23,8 +23,10 @@ class PurchaseService: PurchaseServiceProtocol {
     
     @MainActor func purchase(
         _ iap: ApphudSDK.ApphudProduct,
+        paywallID: String,
         _ completion: @escaping (PurchaseResult) -> Void
     ) {
+        self.logEvent?(PaywallCheckoutStartedEvent(paywallID: paywallID))
         Apphud.purchase(iap) { result in
             
             let iapForAnalytics = IAP(
@@ -35,6 +37,7 @@ class PurchaseService: PurchaseServiceProtocol {
             if let error = result.error {
                 if let skError = error as? SKError, skError.code == .paymentCancelled {
                     self.logEvent?(PurchaseEvent.cancel(iap: iapForAnalytics))
+                    self.logEvent?(PaywallCheckoutCancelledEvent(paywallID: paywallID))
                     completion(.cancel)
                 } else {
                     self.logEvent?(PurchaseEvent.fail(iap: iapForAnalytics))
