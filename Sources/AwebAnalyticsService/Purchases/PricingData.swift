@@ -1,5 +1,7 @@
 import Foundation
 
 public struct PricingData {
-    let localizedPrice: String
+    public let value: Double
+    public let localizedPrice: String
+    public let priceLocale: Locale
 }

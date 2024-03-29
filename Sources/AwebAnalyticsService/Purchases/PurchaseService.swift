@@ -11,7 +11,7 @@ public protocol PurchaseServiceProtocol {
     var isSubActiveStream: AnyPublisher<Bool, Never> { get }
 }
 
-class PurchaseService: PurchaseServiceProtocol {
+public class PurchaseService: PurchaseServiceProtocol {
     
     private struct IAP: IAPProtocol {
         var productID: String
@@ -21,7 +21,7 @@ class PurchaseService: PurchaseServiceProtocol {
     var logEvent: ((EventProtocol) -> Void)?
     @MainActor private let isSubActiveSubject = CurrentValueSubject<Bool, Never>(Apphud.hasActiveSubscription())
     
-    @MainActor func purchase(
+    @MainActor public func purchase(
         _ iap: ApphudSDK.ApphudProduct,
         paywallID: String,
         _ completion: @escaping (PurchaseResult) -> Void
@@ -51,7 +51,7 @@ class PurchaseService: PurchaseServiceProtocol {
         }
     }
     
-    @MainActor func restore(_ completion: @escaping (Bool) -> Void) {
+    @MainActor public func restore(_ completion: @escaping (Bool) -> Void) {
         Apphud.restorePurchases { subscriptions, purchases, error in
             let hasActiveSubscription = Apphud.hasActiveSubscription()
             self.isSubActive = hasActiveSubscription
@@ -59,7 +59,7 @@ class PurchaseService: PurchaseServiceProtocol {
         }
     }
     
-    @MainActor var isSubActive: Bool {
+    @MainActor public var isSubActive: Bool {
         get {
             isSubActiveSubject.value
         }
@@ -68,7 +68,7 @@ class PurchaseService: PurchaseServiceProtocol {
         }
     }
     
-    @MainActor var isSubActiveStream: AnyPublisher<Bool, Never> {
+    @MainActor public var isSubActiveStream: AnyPublisher<Bool, Never> {
         isSubActiveSubject.prepend(Apphud.hasActiveSubscription()).eraseToAnyPublisher()
     }
 }

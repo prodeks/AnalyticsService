@@ -46,4 +46,5 @@ public struct OnboardingStartedEvent: EventProtocol {
     public var params: [String : Any] {
         [:]
     }
+    public init() {}
 }

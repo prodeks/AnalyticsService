@@ -65,7 +65,11 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
             .first(where: { $0.productId == iap.productID })
             .flatMap { apphudProduct in
                 return apphudProduct.skProduct.map { skProduct in
-                    PricingData(localizedPrice: skProduct.localizedPrice ?? "")
+                    PricingData(
+                        value: Double(truncating: skProduct.price), 
+                        localizedPrice: skProduct.localizedPrice ?? "",
+                        priceLocale: skProduct.priceLocale
+                    )
                 }
             }
     }

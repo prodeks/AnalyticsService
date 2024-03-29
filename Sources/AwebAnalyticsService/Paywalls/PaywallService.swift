@@ -13,8 +13,8 @@ public protocol PaywallServiceProtocol: AnyObject {
     var uiFactory: (any PaywallScreenProtocol) -> PaywallControllerProtocol? { get set }
     var apphudPlacements: [ApphudPlacement] { get set }
     
-    func getPaywall<PaywallModel: PaywallScreenProtocol>(
-        _ placement: PaywallPlacementProtocol,
+    func getPaywall<PaywallModel: PaywallScreenProtocol, Placement: PaywallPlacementProtocol>(
+        _ placement: Placement,
         paywallModelType: PaywallModel.Type
     ) -> PaywallControllerProtocol?
 }
@@ -24,13 +24,13 @@ public protocol PaywallControllerProtocol: UIViewController {
     var dismissed: (() -> Void)? { get set }
 }
 
-class PaywallService: PaywallServiceProtocol {
+public class PaywallService: PaywallServiceProtocol {
     
-    var uiFactory: (any PaywallScreenProtocol) -> PaywallControllerProtocol? = { _ in nil }
-    var apphudPlacements: [ApphudPlacement] = []
+    public var uiFactory: (any PaywallScreenProtocol) -> PaywallControllerProtocol? = { _ in nil }
+    public var apphudPlacements: [ApphudPlacement] = []
         
-    func getPaywall<PaywallModel: PaywallScreenProtocol>(
-        _ placement: PaywallPlacementProtocol,
+    public func getPaywall<PaywallModel: PaywallScreenProtocol, Placement: PaywallPlacementProtocol>(
+        _ placement: Placement,
         paywallModelType: PaywallModel.Type
     ) -> PaywallControllerProtocol? {
         

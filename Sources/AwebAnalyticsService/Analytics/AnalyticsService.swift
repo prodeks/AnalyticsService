@@ -20,7 +20,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     
     func registerForNotifications()
     func log(e: EventProtocol)
-    var apphudStarted: () -> Void { get set }
+    var apphudStarted: (() -> Void)? { get set }
 }
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
@@ -32,16 +32,14 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     
     let userID = AppEvents.shared.anonymousID
     
-    public var apphudStarted: () -> Void
+    public var apphudStarted: (() -> Void)?
     let placementsDidLoad: ([ApphudPlacement]) -> Void
     
     var placements = [ApphudPlacement]()
     
     init(
-        apphudStarted: @escaping () -> Void,
         placementsDidLoad: @escaping ([ApphudPlacement]) -> Void
     ) {
-        self.apphudStarted = apphudStarted
         self.placementsDidLoad = placementsDidLoad
     }
     
@@ -56,24 +54,28 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             Log.printLog(l: .analytics, str: String(describing: params))
         }
         
-        apphud.start(apiKey: PurchasesAndAnalytics.Keys.apphudKey) { user in
-            self.apphud.placementsDidLoadCallback { placements in
-                self.logPlacements(placements)
-                self.placements = placements
-                self.placementsDidLoad(placements)
-                self.apphudStarted()
+        if let key = PurchasesAndAnalytics.Keys.apphudKey {
+            apphud.start(apiKey: key) { user in
+                self.apphud.placementsDidLoadCallback { placements in
+                    self.logPlacements(placements)
+                    self.placements = placements
+                    self.placementsDidLoad(placements)
+                    self.apphudStarted?()
+                }
             }
         }
         
-        asaTools.attribute(apiToken: PurchasesAndAnalytics.Keys.asatoolsKey) { response, error in
-            if let response {
-                let firebaseProperties = response.analyticsValues()
-                firebaseProperties.forEach { key, value in
-                    self.firebase.setUserProperty(String(describing: value), forName: key)
+        if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
+            asaTools.attribute(apiToken: key) { response, error in
+                if let response {
+                    let firebaseProperties = response.analyticsValues()
+                    firebaseProperties.forEach { key, value in
+                        self.firebase.setUserProperty(String(describing: value), forName: key)
+                    }
+                    self.log(e: ASAAttributionEvent(params: firebaseProperties))
+                } else if let error = error {
+                    self.log(e: ASAAttributionErrorEvent(description: error.localizedDescription))
                 }
-                self.log(e: ASAAttributionEvent(params: firebaseProperties))
-            } else if let error = error {
-                self.log(e: ASAAttributionErrorEvent(description: error.localizedDescription))
             }
         }
         

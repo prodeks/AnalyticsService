@@ -5,7 +5,7 @@ public protocol URLConvertable {
     func url() -> URL?
 }
 
-class WebViewController: UIViewController {
+public class WebViewController: UIViewController {
     
     let webview = WKWebView()
     
@@ -16,7 +16,7 @@ class WebViewController: UIViewController {
         action: #selector(modalDismiss)
     )
     
-    var item: URLConvertable? {
+    public var item: URLConvertable? {
         didSet {
             if let url = item?.url() {
                 webview.load(URLRequest(url: url))
@@ -24,7 +24,7 @@ class WebViewController: UIViewController {
         }
     }
     
-    override func viewDidLoad() {
+    public override func viewDidLoad() {
         super.viewDidLoad()
         
         navigationItem.leftBarButtonItem = dismissItem

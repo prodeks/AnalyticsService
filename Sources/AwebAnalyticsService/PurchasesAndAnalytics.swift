@@ -2,11 +2,11 @@ import Foundation
 
 public class PurchasesAndAnalytics {
 
-    lazy var analytics = AnalyticsService(apphudStarted: self.apphudStarted) { placements in
+    public lazy var analytics = AnalyticsService { placements in
         self.paywalls.apphudPlacements = placements
     }
-    lazy var purchases = PurchaseService()
-    lazy var paywalls = PaywallService()
+    public lazy var purchases = PurchaseService()
+    public lazy var paywalls = PaywallService()
     
     /// Set this value before accessing the `analytics`
     public var apphudStarted: (() -> Void)!
