@@ -16,8 +16,8 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
     let overlayView = LoaderOverlayView()
     let purchaseService: any PurchaseServiceProtocol
     
-    init(
-        purchaseService: PurchaseService
+    public init(
+        purchaseService: PurchaseServiceProtocol
     ) {
         self.purchaseService = purchaseService
         
@@ -66,7 +66,7 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
             .flatMap { apphudProduct in
                 return apphudProduct.skProduct.map { skProduct in
                     PricingData(
-                        value: Double(truncating: skProduct.price), 
+                        value: Double(truncating: skProduct.price),
                         localizedPrice: skProduct.localizedPrice ?? "",
                         priceLocale: skProduct.priceLocale
                     )
