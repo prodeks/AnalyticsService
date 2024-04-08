@@ -42,7 +42,6 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
         paywallView.delegate = self
         view.addSubview(overlayView)
         overlayView.isHidden = true
-        overlayView.frame = view.bounds
         
         if let navigationController {
             navigationController.setNavigationBarHidden(true, animated: false)
@@ -51,6 +50,11 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
         logOpen?()
     }
     
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        overlayView.frame = view.bounds
+    }
     
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
