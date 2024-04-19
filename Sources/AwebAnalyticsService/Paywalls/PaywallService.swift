@@ -1,5 +1,5 @@
 import UIKit
-import ApphudSDK
+import StoreKit
 
 public protocol PaywallPlacementProtocol {
     var identifier: String { get }
@@ -9,47 +9,25 @@ public protocol PaywallScreenProtocol: RawRepresentable where RawValue == String
     
 }
 
-public protocol PaywallServiceProtocol: AnyObject {
-    var uiFactory: (any PaywallScreenProtocol) -> PaywallControllerProtocol? { get set }
-    var apphudPlacements: [ApphudPlacement] { get set }
-    
-    func getPaywall<PaywallModel: PaywallScreenProtocol, Placement: PaywallPlacementProtocol>(
-        _ placement: Placement,
-        paywallModelType: PaywallModel.Type
-    ) -> PaywallControllerProtocol?
-}
-
 public protocol PaywallControllerProtocol: UIViewController {
-    var apphudProducts: [ApphudProduct] { get set }
+    var products: [SKProduct] { get set }
     var dismissed: (() -> Void)? { get set }
 }
 
+public protocol PaywallServiceProtocol: AnyObject {
+    var uiFactory: ((PaywallPlacementProtocol) -> PaywallControllerProtocol)? { get set }
+    func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol?
+}
+
 public class PaywallService: PaywallServiceProtocol {
+    var products: [SKProduct] = []
     
-    public var uiFactory: (any PaywallScreenProtocol) -> PaywallControllerProtocol? = { _ in nil }
-    public var apphudPlacements: [ApphudPlacement] = []
+    public var uiFactory: ((PaywallPlacementProtocol) -> PaywallControllerProtocol)?
         
-    public func getPaywall<PaywallModel: PaywallScreenProtocol, Placement: PaywallPlacementProtocol>(
-        _ placement: Placement,
-        paywallModelType: PaywallModel.Type
-    ) -> PaywallControllerProtocol? {
-        
+    public func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol? {
         Log.printLog(l: .debug, str: "Show paywall for placement: \(placement.identifier)")
-        if let apphudPaywall = apphudPlacements.first(where: { $0.identifier == placement.identifier })?.paywall,
-           var localPaywall = PaywallModel(rawValue: apphudPaywall.identifier) {
-            
-            // unwrap json from apphud paywall to get to the actual tested value
-            if let abtestedPaywall = (apphudPaywall.json?["paywallID"] as? String).flatMap(PaywallModel.init) {
-                localPaywall = abtestedPaywall
-            }
-            
-            let controller = uiFactory(localPaywall)
-            let products = apphudPaywall.products
-            controller?.apphudProducts = products
-            return controller
-        } else {
-            Log.printLog(l: .error, str: "Could not fetch paywall for placement: \(placement.identifier)")
-            return nil
-        }
+        let controller = uiFactory?(placement)
+        controller?.products = products
+        return controller
     }
 }
