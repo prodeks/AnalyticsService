@@ -3,8 +3,8 @@ import FirebaseAnalytics
 import FirebaseCore
 import AppTrackingTransparency
 import FacebookCore
-import ApphudSDK
 import AdServices
+import FirebaseAuth
 import ASATools
 import BranchSDK
 import AdSupport
@@ -20,50 +20,23 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     
     func registerForNotifications()
     func log(e: EventProtocol)
-    var apphudStarted: (() -> Void)? { get set }
 }
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
     private let firebase = Analytics.self
     private let branch = Branch.getInstance()
-    private let apphud = Apphud.self
     private let asaTools = ASATools.instance
     
     let userID = AppEvents.shared.anonymousID
     
-    public var apphudStarted: (() -> Void)?
-    let placementsDidLoad: ([ApphudPlacement]) -> Void
-    
-    var placements = [ApphudPlacement]()
-    
-    init(
-        placementsDidLoad: @escaping ([ApphudPlacement]) -> Void
-    ) {
-        self.placementsDidLoad = placementsDidLoad
-    }
+    public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
     
     @MainActor public func didFinishLaunchingWithOptions(
         application: UIApplication,
         options: [UIApplication.LaunchOptionsKey: Any]?
     ) {
         FirebaseApp.configure()
-        
-        branch.setIdentity(Apphud.deviceID())
-        branch.initSession(launchOptions: options) { (params, error) in
-            Log.printLog(l: .analytics, str: String(describing: params))
-        }
-        
-        if let key = PurchasesAndAnalytics.Keys.apphudKey {
-            apphud.start(apiKey: key) { user in
-                self.apphud.placementsDidLoadCallback { placements in
-                    self.logPlacements(placements)
-                    self.placements = placements
-                    self.placementsDidLoad(placements)
-                    self.apphudStarted?()
-                }
-            }
-        }
         
         if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
             asaTools.attribute(apiToken: key) { response, error in
@@ -79,29 +52,30 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             }
         }
         
-        let userID = Apphud.userID()
-        firebase.setUserID(userID)
-        if let instanceID = firebase.appInstanceID() {
-            apphud.addAttribution(
-                data: nil,
-                from: .firebase,
-                identifer: instanceID,
-                callback: nil
-            )
-        }
-        
         ApplicationDelegate.shared.application(
             application,
             didFinishLaunchingWithOptions: options
         )
+        
+        analyticsStarted?(options)
     }
     
-    func logPlacements(_ apphudPlacements: [ApphudPlacement]) {
-        var str = "AppHud placements received:\n"
-        apphudPlacements.forEach { placement in
-            str.append("- \(placement.identifier), paywall - \(placement.paywall?.identifier ?? "missing")\n")
+    func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
+        await withCheckedContinuation { c in
+            Auth.auth().signInAnonymously { result, error in
+                if let result {
+                    let userID = result.user.uid
+                    
+                    self.branch.setIdentity(userID)
+                    self.branch.initSession(launchOptions: options) { (params, error) in
+                        Log.printLog(l: .analytics, str: String(describing: params))
+                    }
+                    
+                    self.firebase.setUserID(userID)
+                }
+                c.resume()
+            }
         }
-        Log.printLog(l: .debug, str: "\n\n\n\(str)\n\n")
     }
     
     public func registerForNotifications() {
@@ -130,7 +104,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
-        apphud.submitPushNotificationsToken(token: deviceToken, callback: nil)
+        
     }
     
     public func applicationDidBecomeActive(_ application: UIApplication) {
@@ -140,17 +114,9 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 Log.printLog(l: .debug, str: "IDFA status: \(status)")
                 DispatchQueue.global(qos: .default).async {
                     let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
-                    Apphud.setAdvertisingIdentifier(idfa)
                     if #available(iOS 14.3, *) {
                         if let token = try? AAAttribution.attributionToken() {
-                            DispatchQueue.main.async {
-                                Apphud.addAttribution(
-                                    data: nil,
-                                    from: .appleAdsAttribution,
-                                    identifer: token,
-                                    callback: nil
-                                )
-                            }
+                            
                         }
                     }
                 }
@@ -172,31 +138,12 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable : Any]
     ) {
-        apphud.handlePushNotification(apsInfo: userInfo)
         branch.handlePushNotification(userInfo)
     }
     
     public func log(e: EventProtocol) {
     
         Log.printLog(l: .analytics, str: e.name + " \(e.params)")
-        
-        if let paywallOpenEvent = e as? PaywallOpenEvent {
-            if let paywall = placements
-                .compactMap({ $0.paywall })
-                .first(where: { $0.identifier == paywallOpenEvent.paywallID }) {
-                apphud.paywallShown(paywall)
-            }
-            
-            return
-        }
-        if let paywallClosedEvent = e as? PaywallClosedEvent {
-            if let paywall = placements
-                .compactMap({ $0.paywall })
-                .first(where: { $0.identifier == paywallClosedEvent.paywallID }) {
-                apphud.paywallClosed(paywall)
-            }
-            return
-        }
         
         firebase.logEvent(e.name, parameters: e.params)
         
@@ -216,13 +163,13 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         if let purchaseEvent = e as? PurchaseEvent,
             case let .success(iap) = purchaseEvent {
             AppEvents.shared.logPurchase(
-                amount: Double(iap.price),
+                amount: Double(iap.1),
                 currency: "USD"
             )
             let event = BranchEvent.standardEvent(.purchase)
             event.currency = .USD
-            event.eventDescription = iap.productID
-            event.revenue = NSDecimalNumber(value: iap.price)
+            event.eventDescription = iap.0
+            event.revenue = NSDecimalNumber(value: iap.1)
             event.logEvent()
         }
     }
@@ -230,11 +177,9 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
 extension AnalyticsService: UNUserNotificationCenterDelegate {
     @MainActor public func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        apphud.handlePushNotification(apsInfo: response.notification.request.content.userInfo)
         completionHandler()
     }
     @MainActor public func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        apphud.handlePushNotification(apsInfo: notification.request.content.userInfo)
         completionHandler([])
     }
 }

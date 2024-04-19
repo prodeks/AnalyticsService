@@ -3,21 +3,20 @@ import StoreKit
 import Lottie
 import ApphudSDK
 
-public class PaywallController<V: PaywallViewProtocol>: UIViewController, 
-                                                            PaywallViewDelegateProtocol,
-                                                            UIViewControllerTransitioningDelegate,
-                                                            PaywallControllerProtocol {
-    
-    public var apphudProducts: [ApphudSDK.ApphudProduct] = []
+public class PaywallController<V: PaywallViewProtocol>: UIViewController,
+                                                        PaywallViewDelegateProtocol,
+                                                        UIViewControllerTransitioningDelegate,
+                                                        PaywallControllerProtocol {
+    public var products: [SKProduct] = []
     public var dismissed: (() -> Void)?
     public var logOpen: (() -> Void)?
     public var logClose: (() -> Void)?
     
     let overlayView = LoaderOverlayView()
-    let purchaseService: any PurchaseServiceProtocol
+    let purchaseService: PurchaseService
     
-    public init(
-        purchaseService: PurchaseServiceProtocol
+    init(
+        purchaseService: PurchaseService
     ) {
         self.purchaseService = purchaseService
         
@@ -64,17 +63,15 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
         }
     }
     
-    public func pricingData(_ iap: IAPProtocol) -> PricingData? {
-        return apphudProducts
-            .first(where: { $0.productId == iap.productID })
-            .flatMap { apphudProduct in
-                return apphudProduct.skProduct.map { skProduct in
-                    PricingData(
-                        value: Double(truncating: skProduct.price),
-                        localizedPrice: skProduct.localizedPrice ?? "",
-                        priceLocale: skProduct.priceLocale
-                    )
-                }
+    public func pricingData(_ iap: any IAPProtocol) -> PricingData? {
+        return products
+            .first(where: { $0.productIdentifier == iap.productID })
+            .flatMap { product in
+                PricingData(
+                    value: Double(truncating: product.price),
+                    localizedPrice: product.localizedPrice ?? "",
+                    priceLocale: product.priceLocale
+                )
             }
     }
     
@@ -90,12 +87,12 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
         }
     }
     
-    public func purchase(_ iap: IAPProtocol) {
+    public func purchase(_ iap: any IAPProtocol) {
         self.overlayView.isHidden = false
-        if let apphudProduct = apphudProducts.first(where: { $0.productId == iap.productID }) {
+        if let product = products.first(where: { $0.productIdentifier == iap.productID }) {
             purchaseService.purchase(
-                apphudProduct,
-                paywallID: paywallView.appHudPaywallID.rawValue
+                iap,
+                paywallID: paywallView.paywallID.rawValue
             ) { [weak self] result in
                 guard let self = self else { return }
                 self.overlayView.isHidden = true

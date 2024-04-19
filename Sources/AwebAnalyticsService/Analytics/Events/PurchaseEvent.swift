@@ -15,18 +15,18 @@ enum PurchaseEvent: EventProtocol {
     var params: [String : Any] {
         switch self {
         case .success(let iap):
-            return ["product_id": iap.productID, AnalyticsParameterValue: iap.productID]
+            return ["product_id": iap.0, AnalyticsParameterValue: iap.0]
         case .cancel(let iap):
-            return ["product_id": iap.productID, AnalyticsParameterValue: iap.productID]
+            return ["product_id": iap.0, AnalyticsParameterValue: iap.0]
         case .fail(let iap):
-            return ["product_id": iap.productID, AnalyticsParameterValue: iap.productID]
+            return ["product_id": iap.0, AnalyticsParameterValue: iap.0]
         case .restore:
             return [:]
         }
     }
     
-    case success(iap: IAPProtocol)
-    case cancel(iap: IAPProtocol)
-    case fail(iap: IAPProtocol)
+    case success(iap: (String, Float))
+    case cancel(iap: (String, Float))
+    case fail(iap: (String, Float))
     case restore
 }
