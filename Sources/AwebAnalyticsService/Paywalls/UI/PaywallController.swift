@@ -1,7 +1,6 @@
 import Foundation
 import StoreKit
 import Lottie
-import ApphudSDK
 
 public class PaywallController<V: PaywallViewProtocol>: UIViewController,
                                                         PaywallViewDelegateProtocol,
