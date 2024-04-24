@@ -9,6 +9,7 @@ import ASATools
 import BranchSDK
 import AdSupport
 import UserNotifications
+import SwiftyStoreKit
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -56,6 +57,23 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             application,
             didFinishLaunchingWithOptions: options
         )
+        
+        SwiftyStoreKit.completeTransactions(atomically: true) { purchases in
+            for purchase in purchases {
+                switch purchase.transaction.transactionState {
+                case .purchased, .restored:
+                    if purchase.needsFinishTransaction {
+                        // Deliver content from server, then:
+                        SwiftyStoreKit.finishTransaction(purchase.transaction)
+                    }
+                    // Unlock content
+                case .failed, .purchasing, .deferred:
+                    break // do nothing
+                @unknown default:
+                    break
+                }
+            }
+        }
         
         analyticsStarted?(options)
     }
