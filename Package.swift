@@ -12,7 +12,7 @@ let package = Package(
         .package(url: "https://github.com/facebook/facebook-ios-sdk", exact: Version(16, 3, 1)),
         .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(10, 19, 0)),
         .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 4, 6)),
-        .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 1)),
+        .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 3)),
         .package(url: "https://github.com/bizz84/SwiftyStoreKit.git", exact: Version(0, 16, 4)),
     ],
     targets: [
