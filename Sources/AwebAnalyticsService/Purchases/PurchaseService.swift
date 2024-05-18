@@ -103,11 +103,13 @@ public class PurchaseService: PurchaseServiceProtocol {
             switch result {
             case .success(let receipt):
                 let purchasedSub = self.iaps.filter { iap in
+                    
                     let purchaseResult = SwiftyStoreKit.verifySubscription(
-                        ofType: .autoRenewable,
+                        ofType: iap.type.swiftyStoreKitValue(),
                         productId: iap.productID,
                         inReceipt: receipt
                     )
+                    
                     if case .purchased(let expiryDate, _) = purchaseResult {
                         return expiryDate > Date()
                     } else {
