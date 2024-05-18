@@ -9,6 +9,7 @@ public protocol PurchaseServiceProtocol: AnyObject {
     var isSubActiveStream: AnyPublisher<Bool, Never> { get }
     func purchase( _ iap: any IAPProtocol, paywallID: String, _ completion: @escaping (PurchaseResult) -> Void)
     func restore(_ completion: @escaping (Bool) -> Void)
+    func verifySubscriptions(_ completion: @escaping (Bool) -> Void)
 }
 
 public class PurchaseService: PurchaseServiceProtocol {
@@ -93,7 +94,7 @@ public class PurchaseService: PurchaseServiceProtocol {
         }
     }
     
-    func verifySubscriptions(_ completion: @escaping (Bool) -> Void) {
+    public func verifySubscriptions(_ completion: @escaping (Bool) -> Void) {
         let appleValidator = AppleReceiptValidator(
             service: value(debug: { .sandbox }, release: { .production }),
             sharedSecret: PurchasesAndAnalytics.Keys.sharedSecret
