@@ -5,7 +5,7 @@ import Combine
 
 public protocol PurchaseServiceProtocol: AnyObject {
     var iaps: [any IAPProtocol] { get set }
-    var isSubActive: Bool { get }
+    var isSubActive: Bool { get set }
     var isSubActiveStream: AnyPublisher<Bool, Never> { get }
     func purchase( _ iap: any IAPProtocol, paywallID: String, _ completion: @escaping (PurchaseResult) -> Void)
     func restore(_ completion: @escaping (Bool) -> Void)
