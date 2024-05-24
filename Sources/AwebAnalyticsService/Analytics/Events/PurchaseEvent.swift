@@ -1,6 +1,7 @@
 import Foundation
 import Firebase
 import FacebookCore
+import StoreKit
 
 enum PurchaseEvent: EventProtocol {
     var name: String {
@@ -15,11 +16,19 @@ enum PurchaseEvent: EventProtocol {
     var params: [String : Any] {
         switch self {
         case .success(let iap):
-            return ["product_id": iap.0, AnalyticsParameterValue: iap.0]
+            return ["product_id": iap.0, AnalyticsParameterValue: iap.1]
         case .cancel(let iap):
-            return ["product_id": iap.0, AnalyticsParameterValue: iap.0]
+            return ["product_id": iap.0, AnalyticsParameterValue: iap.1]
         case .fail(let iap):
-            return ["product_id": iap.0, AnalyticsParameterValue: iap.0]
+            return ["product_id": iap.0, AnalyticsParameterValue: {
+                let error = iap.1
+                var str = ""
+                str.append("code: \(error.code)\n")
+                error.errorUserInfo.forEach { k, v in
+                    str.append("\(k): \(v)\n")
+                }
+                return str
+            }()]
         case .restore:
             return [:]
         }
@@ -27,6 +36,6 @@ enum PurchaseEvent: EventProtocol {
     
     case success(iap: (String, Float))
     case cancel(iap: (String, Float))
-    case fail(iap: (String, Float))
+    case fail(iap: (String, SKError))
     case restore
 }

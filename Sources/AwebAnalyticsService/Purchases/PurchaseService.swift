@@ -41,7 +41,7 @@ public class PurchaseService: PurchaseServiceProtocol {
         _ completion: @escaping (PurchaseResult) -> Void
     ) {
         self.logEvent?(PaywallCheckoutStartedEvent(paywallID: paywallID))
-        SwiftyStoreKit.purchaseProduct(iap.productID) { purchaseResult in
+        SwiftyStoreKit.purchaseProduct(iap.productID) { purchaseResult -> Void in
             
             switch purchaseResult {
             case .deferred, .success:
@@ -54,7 +54,7 @@ public class PurchaseService: PurchaseServiceProtocol {
                     self.logEvent?(PaywallCheckoutCancelledEvent(paywallID: paywallID))
                     completion(.cancel)
                 } else {
-                    self.logEvent?(PurchaseEvent.fail(iap: (iap.productID, iap.price)))
+                    self.logEvent?(PurchaseEvent.fail(iap: (iap.productID, error)))
                     completion(.fail)
                 }
             }
