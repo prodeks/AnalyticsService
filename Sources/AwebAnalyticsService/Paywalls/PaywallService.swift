@@ -16,7 +16,7 @@ public protocol PaywallControllerProtocol: UIViewController {
 
 public protocol PaywallServiceProtocol: AnyObject {
     var placements: Set<String> { get set }
-    var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol)? { get set }
+    var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol?)? { get set }
     func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol?
 }
 
@@ -32,7 +32,7 @@ public class PaywallService: PaywallServiceProtocol {
     
     public var placements = Set<String>()
     
-    public var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol)?
+    public var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol?)?
     
     var paywallsAndProducts = [PaywallAndProduct]()
     
