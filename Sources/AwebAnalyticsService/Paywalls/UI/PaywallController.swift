@@ -1,23 +1,27 @@
 import Foundation
 import StoreKit
 import Lottie
+import Adapty
 
-public class PaywallController<V: PaywallViewProtocol>: UIViewController,
-                                                        PaywallViewDelegateProtocol,
-                                                        UIViewControllerTransitioningDelegate,
-                                                        PaywallControllerProtocol {
-    public var products: [SKProduct] = []
+public class PaywallController: UIViewController, PaywallViewDelegateProtocol, UIViewControllerTransitioningDelegate, PaywallControllerProtocol {
+    
     public var dismissed: (() -> Void)?
     public var logOpen: (() -> Void)?
     public var logClose: (() -> Void)?
     
     let overlayView = LoaderOverlayView()
     let purchaseService: PurchaseService
+    let adaptyPaywallData: PaywallAndProduct
+    let paywallView: any PaywallViewProtocol
     
     init(
-        purchaseService: PurchaseService
+        purchaseService: PurchaseService, 
+        paywallView: any PaywallViewProtocol,
+        adaptyPaywallData: PaywallAndProduct
     ) {
+        self.paywallView = paywallView
         self.purchaseService = purchaseService
+        self.adaptyPaywallData = adaptyPaywallData
         
         super.init(nibName: nil, bundle: nil)
     }
@@ -26,12 +30,8 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
         fatalError("init(coder:) has not been implemented")
     }
     
-    var paywallView: V {
-        return view as! V
-    }
-    
     public override func loadView() {
-        view = V()
+        view = paywallView
     }
     
     public override func viewDidLoad() {
@@ -45,7 +45,7 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
             navigationController.setNavigationBarHidden(true, animated: false)
         }
         
-        logOpen?()
+        Adapty.logShowPaywall(adaptyPaywallData.adaptyPaywall)
     }
     
     public override func viewDidLayoutSubviews() {
@@ -63,13 +63,13 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
     }
     
     public func pricingData(_ iap: any IAPProtocol) -> PricingData? {
-        return products
-            .first(where: { $0.productIdentifier == iap.productID })
+        return adaptyPaywallData.products
+            .first(where: { $0.skProduct.productIdentifier == iap.productID })
             .flatMap { product in
                 PricingData(
-                    value: Double(truncating: product.price),
+                    value: Double(truncating: product.skProduct.price),
                     localizedPrice: product.localizedPrice ?? "",
-                    priceLocale: product.priceLocale
+                    priceLocale: product.skProduct.priceLocale
                 )
             }
     }
@@ -88,9 +88,9 @@ public class PaywallController<V: PaywallViewProtocol>: UIViewController,
     
     public func purchase(_ iap: any IAPProtocol) {
         self.overlayView.isHidden = false
-        if let product = products.first(where: { $0.productIdentifier == iap.productID }) {
-            purchaseService.purchase(
-                iap,
+        if let product = adaptyPaywallData.products.first(where: { $0.skProduct.productIdentifier == iap.productID }) {
+            purchaseService.purchaseAdaptyProduct(
+                product,
                 paywallID: paywallView.paywallID.rawValue
             ) { [weak self] result in
                 guard let self = self else { return }

@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 4, 7)),
         .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 3)),
         .package(url: "https://github.com/bizz84/SwiftyStoreKit.git", exact: Version(0, 16, 4)),
+        .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(2, 11, 0)),
     ],
     targets: [
         .target(
@@ -25,7 +26,8 @@ let package = Package(
                 .product(name: "BranchSDK", package: "ios-branch-sdk-spm"),
                 .product(name: "ASATools", package: "ios_sdk"),
                 .product(name: "Lottie", package: "lottie-ios"),
-                .product(name: "SwiftyStoreKit", package: "SwiftyStoreKit")
+                .product(name: "SwiftyStoreKit", package: "SwiftyStoreKit"),
+                .product(name: "Adapty", package: "AdaptySDK-iOS")
             ]
         )
     ]

@@ -2,17 +2,17 @@ import Foundation
 import StoreKit
 import SwiftyStoreKit
 import Combine
+import Adapty
 
 public protocol PurchaseServiceProtocol: AnyObject {
     var iaps: [any IAPProtocol] { get set }
     var isSubActive: Bool { get set }
     var isSubActiveStream: AnyPublisher<Bool, Never> { get }
-    func purchase( _ iap: any IAPProtocol, paywallID: String, _ completion: @escaping (PurchaseResult) -> Void)
+    func purchaseAdaptyProduct(_ product: AdaptyPaywallProduct, paywallID: String, _ completion: @escaping (PurchaseResult) -> Void)
     func restore(_ completion: @escaping (Bool) -> Void)
-    func verifySubscriptions(_ completion: @escaping (Bool) -> Void)
 }
 
-public class PurchaseService: PurchaseServiceProtocol {
+public class PurchaseService: @preconcurrency PurchaseServiceProtocol {
     
     /// Assign to this variable all your available  in app purchase models
     public var iaps: [any IAPProtocol] = []
@@ -35,99 +35,43 @@ public class PurchaseService: PurchaseServiceProtocol {
     
     private let relay = CurrentValueSubject<Bool, Never>(UserDefaults.standard.isSubActive)
     
-    @MainActor public func purchase(
-        _ iap: any IAPProtocol,
-        paywallID: String,
-        _ completion: @escaping (PurchaseResult) -> Void
-    ) {
+    public func purchaseAdaptyProduct(_ product: AdaptyPaywallProduct, paywallID: String, _ completion: @escaping (PurchaseResult) -> Void) {
         self.logEvent?(PaywallCheckoutStartedEvent(paywallID: paywallID))
-        SwiftyStoreKit.purchaseProduct(iap.productID) { purchaseResult -> Void in
-            
+        Adapty.makePurchase(product: product) { purchaseResult in
             switch purchaseResult {
-            case .deferred, .success:
-                self.isSubActive = true
-                self.logEvent?(PurchaseEvent.success(iap: (iap.productID, iap.price)))
+            case .success:
                 completion(.success)
-            case .error(let error):
-                if error.code == .paymentCancelled {
-                    self.logEvent?(PurchaseEvent.cancel(iap: (iap.productID, iap.price)))
+            case .failure(let error):
+                if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {
+                    self.logEvent?(PurchaseEvent.cancel(iap: (product.skProduct.productIdentifier, Float(truncating: product.skProduct.price))))
                     self.logEvent?(PaywallCheckoutCancelledEvent(paywallID: paywallID))
                     completion(.cancel)
                 } else {
-                    self.logEvent?(PurchaseEvent.fail(iap: (iap.productID, error)))
+                    self.logEvent?(PurchaseEvent.fail(iap: (product.skProduct.productIdentifier, error)))
                     completion(.fail)
                 }
             }
         }
     }
-    
+
     @MainActor public func restore(_ completion: @escaping (Bool) -> Void) {
-        SwiftyStoreKit.restorePurchases { restoreResults in
-            guard !restoreResults.restoredPurchases.isEmpty else {
+        Adapty.restorePurchases { restoreResults in
+            switch restoreResults {
+            case .success(let profile):
+                let hasSub = profile.accessLevels["premium"]?.isActive ?? false
+                completion(hasSub)
+            case .failure:
                 completion(false)
-                return
-            }
-            self.verifySubscriptions(completion)
-        }
-    }
-    
-    func getProducts() async -> [SKProduct] {
-        assert(!iaps.isEmpty)
-        return await withCheckedContinuation { c in
-            SwiftyStoreKit.retrieveProductsInfo(Set(iaps.map { $0.productID })) { retrieveResults in
-                let products = retrieveResults.retrievedProducts.map { $0 }
-                c.resume(with: .success(products))
             }
         }
     }
     
     func verifySubscriptionIfNeeded() async {
-        await withCheckedContinuation { c in
-            if isSubActive {
-                verifySubscriptions { hasSub in
-                    self.isSubActive = hasSub
-                    c.resume()
-                }
-            } else {
-                c.resume()
-            }
+        if let profile = try? await Adapty.getProfile() {
+            let hasSub = profile.accessLevels["premium"]?.isActive ?? false
+            self.isSubActive = hasSub
         }
     }
-    
-    public func verifySubscriptions(_ completion: @escaping (Bool) -> Void) {
-        let appleValidator = AppleReceiptValidator(
-            service: value(debug: { .sandbox }, release: { .production }),
-            sharedSecret: PurchasesAndAnalytics.Keys.sharedSecret
-        )
-        
-        SwiftyStoreKit.verifyReceipt(using: appleValidator) { result in
-            switch result {
-            case .success(let receipt):
-                let purchasedSub = self.iaps.filter { iap in
-                    
-                    let purchaseResult = SwiftyStoreKit.verifySubscription(
-                        ofType: iap.type.swiftyStoreKitValue(),
-                        productId: iap.productID,
-                        inReceipt: receipt
-                    )
-                    
-                    if case .purchased(let expiryDate, _) = purchaseResult {
-                        return expiryDate > Date()
-                    } else {
-                        return false
-                    }
-                }
-                
-                let hasActiveSub = !purchasedSub.isEmpty
-                
-                completion(hasActiveSub)
-                
-            case .error:
-                completion(false)
-            }
-        }
-    }
-    
 }
 
 extension UserDefaults {

@@ -4,7 +4,7 @@ public class PurchasesAndAnalytics {
 
     public lazy var analytics = AnalyticsService()
     public lazy var purchases = PurchaseService()
-    public lazy var paywalls = PaywallService()
+    public lazy var paywalls = PaywallService(purchaseService: purchases)
     
     /// Set this value before accessing the `analytics`
     public var dataFetchComplete: (() -> Void)?
@@ -15,8 +15,7 @@ public class PurchasesAndAnalytics {
         analytics.analyticsStarted = { options in
             Task {
                 await self.analytics.firebaseSignIn(options)
-                let products = await self.purchases.getProducts()
-                self.paywalls.products = products
+                await self.paywalls.fetchPaywallsAndProducts()
                 await self.purchases.verifySubscriptionIfNeeded()
                 await MainActor.run {
                     self.dataFetchComplete?()
@@ -29,9 +28,5 @@ public class PurchasesAndAnalytics {
     
     func log(_ e: EventProtocol) {
         analytics.log(e: e)
-    }
-    
-    public func getPaywallController<V: PaywallViewProtocol>() -> PaywallController<V> {
-        return PaywallController<V>(purchaseService: purchases)
     }
 }

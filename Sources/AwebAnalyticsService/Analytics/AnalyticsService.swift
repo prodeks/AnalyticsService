@@ -10,6 +10,7 @@ import BranchSDK
 import AdSupport
 import UserNotifications
 import SwiftyStoreKit
+import Adapty
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -28,8 +29,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private let firebase = Analytics.self
     private let branch = Branch.getInstance()
     private let asaTools = ASATools.instance
-    
-    let userID = AppEvents.shared.anonymousID
+    private let adapty = Adapty.self
     
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
     
@@ -84,6 +84,9 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 if let result {
                     let userID = result.user.uid
                     
+                    if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
+                        self.adapty.activate(key, customerUserId: userID)
+                    }
                     self.branch.setIdentity(userID)
                     self.branch.initSession(launchOptions: options) { (params, error) in
                         Log.printLog(l: .analytics, str: String(describing: params))

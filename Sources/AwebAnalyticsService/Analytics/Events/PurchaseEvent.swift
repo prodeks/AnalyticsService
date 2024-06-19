@@ -2,6 +2,7 @@ import Foundation
 import Firebase
 import FacebookCore
 import StoreKit
+import Adapty
 
 enum PurchaseEvent: EventProtocol {
     var name: String {
@@ -23,7 +24,7 @@ enum PurchaseEvent: EventProtocol {
             return ["product_id": iap.0, AnalyticsParameterValue: {
                 let error = iap.1
                 var str = ""
-                str.append("code: \(error.code)\n")
+                str.append("code: \(error.errorCode)\n")
                 error.errorUserInfo.forEach { k, v in
                     str.append("\(k): \(v)\n")
                 }
@@ -36,6 +37,6 @@ enum PurchaseEvent: EventProtocol {
     
     case success(iap: (String, Float))
     case cancel(iap: (String, Float))
-    case fail(iap: (String, SKError))
+    case fail(iap: (String, AdaptyError))
     case restore
 }
