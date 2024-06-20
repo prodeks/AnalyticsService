@@ -53,6 +53,15 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             }
         }
         
+        if let appInstanceId = Analytics.appInstanceID() {
+            let builder = AdaptyProfileParameters.Builder()
+                .with(firebaseAppInstanceId: appInstanceId)
+                    
+            self.adapty.updateProfile(params: builder.build()) { error in
+                        // handle error
+            }
+        }
+        
         ApplicationDelegate.shared.application(
             application,
             didFinishLaunchingWithOptions: options
