@@ -40,6 +40,7 @@ public class PurchaseService: @preconcurrency PurchaseServiceProtocol {
         Adapty.makePurchase(product: product) { purchaseResult in
             switch purchaseResult {
             case .success:
+                self.relay.send(true)
                 completion(.success)
             case .failure(let error):
                 if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {
