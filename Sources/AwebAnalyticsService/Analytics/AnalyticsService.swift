@@ -53,15 +53,6 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             }
         }
         
-        if let appInstanceId = Analytics.appInstanceID() {
-            let builder = AdaptyProfileParameters.Builder()
-                .with(firebaseAppInstanceId: appInstanceId)
-                    
-            self.adapty.updateProfile(params: builder.build()) { error in
-                        // handle error
-            }
-        }
-        
         ApplicationDelegate.shared.application(
             application,
             didFinishLaunchingWithOptions: options
@@ -95,6 +86,17 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     
                     if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                         self.adapty.activate(key, customerUserId: userID)
+                        
+                        if let appInstanceId = Analytics.appInstanceID() {
+                            let builder = AdaptyProfileParameters.Builder()
+                                .with(firebaseAppInstanceId: appInstanceId)
+                                    
+                            self.adapty.updateProfile(params: builder.build()) { error in
+                                if let error {
+                                    Log.printLog(l: .analytics, str: error.localizedDescription)
+                                }
+                            }
+                        }
                     }
                     self.branch.setIdentity(userID)
                     self.branch.initSession(launchOptions: options) { (params, error) in
