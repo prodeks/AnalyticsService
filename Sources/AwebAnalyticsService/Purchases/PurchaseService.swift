@@ -12,7 +12,7 @@ public protocol PurchaseServiceProtocol: AnyObject {
     func restore(_ completion: @escaping (Bool) -> Void)
 }
 
-public class PurchaseService: @preconcurrency PurchaseServiceProtocol {
+public class PurchaseService: PurchaseServiceProtocol {
     
     /// Assign to this variable all your available  in app purchase models
     public var iaps: [any IAPProtocol] = []
