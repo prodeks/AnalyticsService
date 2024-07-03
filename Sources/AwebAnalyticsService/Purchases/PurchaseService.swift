@@ -1,6 +1,5 @@
 import Foundation
 import StoreKit
-import SwiftyStoreKit
 import Combine
 import Adapty
 
@@ -40,7 +39,7 @@ public class PurchaseService: PurchaseServiceProtocol {
         Adapty.makePurchase(product: product) { purchaseResult in
             switch purchaseResult {
             case .success:
-                self.relay.send(true)
+                self.isSubActive = true
                 completion(.success)
             case .failure(let error):
                 if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {

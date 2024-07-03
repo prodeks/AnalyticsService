@@ -161,15 +161,6 @@
         "revision" : "9f0c76544701845ad98716f3f6a774a892152bcb",
         "version" : "1.26.0"
       }
-    },
-    {
-      "identity" : "swiftystorekit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/bizz84/SwiftyStoreKit.git",
-      "state" : {
-        "revision" : "9ce911639680113dac9b554d6243e406a9758ebe",
-        "version" : "0.16.4"
-      }
     }
   ],
   "version" : 2
