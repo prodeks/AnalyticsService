@@ -6,6 +6,7 @@ import Adapty
 public class PaywallController: UIViewController, PaywallViewDelegateProtocol, UIViewControllerTransitioningDelegate, PaywallControllerProtocol {
     
     public var dismissed: (() -> Void)?
+    public var navigated: ((PaywallPlacementProtocol) -> Void)?
     public var logOpen: (() -> Void)?
     public var logClose: (() -> Void)?
     
@@ -117,6 +118,10 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     public func privacyPolicyTap(_ item: URLConvertable) {
         presentPolicyItem(item)
+    }
+    
+    public func navigate(to placement: PaywallPlacementProtocol) {
+        navigated?(placement)
     }
     
     public func dismiss() {
