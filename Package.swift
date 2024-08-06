@@ -10,7 +10,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/BranchMetrics/ios-branch-sdk-spm", exact: Version(3, 4, 3)),
         .package(url: "https://github.com/facebook/facebook-ios-sdk", exact: Version(17, 0, 2)),
-        .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(10, 27, 0)),
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(11, 0, 0)),
         .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 4, 7)),
         .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 3)),
         .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(2, 11, 0)),
@@ -22,6 +22,7 @@ let package = Package(
                 .product(name: "FacebookCore", package: "facebook-ios-sdk"),
                 .product(name: "FirebaseAnalytics", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseMessaging", package: "firebase-ios-sdk"),
                 .product(name: "BranchSDK", package: "ios-branch-sdk-spm"),
                 .product(name: "ASATools", package: "ios_sdk"),
                 .product(name: "Lottie", package: "lottie-ios"),
