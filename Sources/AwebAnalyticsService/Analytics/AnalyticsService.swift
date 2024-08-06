@@ -10,6 +10,7 @@ import BranchSDK
 import AdSupport
 import UserNotifications
 import Adapty
+import FirebaseMessaging
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -56,6 +57,8 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             application,
             didFinishLaunchingWithOptions: options
         )
+        
+        Messaging.messaging().delegate = self
         
         analyticsStarted?(options)
     }
@@ -203,5 +206,13 @@ extension AnalyticsService: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([])
+    }
+}
+
+extension AnalyticsService: MessagingDelegate {
+    public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        if let fcmToken {
+            Log.printLog(l: .debug, str: "Did receive FCM token - \(fcmToken)")
+        }
     }
 }
