@@ -205,7 +205,9 @@ extension AnalyticsService: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([])
+        let userInfo = notification.request.content.userInfo
+        Log.printLog(l: .debug, str: "Will present notification, userInfo \n\(userInfo)")
+        completionHandler([.banner, .badge, .sound])
     }
 }
 
