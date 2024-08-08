@@ -13,7 +13,7 @@ let package = Package(
         .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(11, 0, 0)),
         .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 4, 7)),
         .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 3)),
-        .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(2, 11, 0)),
+        .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(3, 0, 2)),
     ],
     targets: [
         .target(
