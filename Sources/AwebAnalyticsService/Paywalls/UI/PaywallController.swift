@@ -12,13 +12,13 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     let overlayView = LoaderOverlayView()
     let purchaseService: PurchaseService
-    let adaptyPaywallData: PaywallAndProduct
+    let adaptyPaywallData: CustomPaywallData
     let paywallView: any PaywallViewProtocol
     
     init(
         purchaseService: PurchaseService, 
         paywallView: any PaywallViewProtocol,
-        adaptyPaywallData: PaywallAndProduct
+        adaptyPaywallData: CustomPaywallData
     ) {
         self.paywallView = paywallView
         self.purchaseService = purchaseService

@@ -1,4 +1,5 @@
 import UIKit
+import AdaptyUI
 import StoreKit
 import Adapty
 
@@ -21,7 +22,27 @@ public protocol PaywallServiceProtocol: AnyObject {
     func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol?
 }
 
-struct PaywallAndProduct {
+enum PaywallData {
+    case customPaywall(CustomPaywallData)
+    case adaptyBuilder(AdaptyBuilderData)
+    
+    var placementID: String {
+        switch self {
+        case .customPaywall(let customPaywallData):
+            return customPaywallData.placement
+        case .adaptyBuilder(let adaptyBuilderData):
+            return adaptyBuilderData.placement
+        }
+    }
+}
+
+struct AdaptyBuilderData {
+    let placement: String
+    let adaptyPaywall: AdaptyPaywall
+    let configuration: AdaptyUI.LocalizedViewConfiguration
+}
+
+struct CustomPaywallData {
     let placement: String
     let adaptyPaywall: AdaptyPaywall
     let products: [AdaptyPaywallProduct]
@@ -35,7 +56,7 @@ public class PaywallService: PaywallServiceProtocol {
     
     public var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol?)?
     
-    var paywallsAndProducts = [PaywallAndProduct]()
+    var paywallData = [PaywallData]()
     
     let purchaseService: PurchaseService
     
@@ -47,13 +68,34 @@ public class PaywallService: PaywallServiceProtocol {
         Log.printLog(l: .debug, str: "Show paywall for placement: \(placement.identifier)")
         assert(uiFactory != nil)
         
-        if let paywallData = paywallsAndProducts.first(where: { $0.placement == placement.identifier }),
-           let view = uiFactory?(paywallData.adaptyPaywall.name) {
-            return PaywallController(
-                purchaseService: purchaseService,
-                paywallView: view,
-                adaptyPaywallData: paywallData
-            )
+        if let paywallData = paywallData.first(where: { $0.placementID == placement.identifier }) {
+            switch paywallData {
+            case .customPaywall(let customPaywallData):
+                if let view = uiFactory?(customPaywallData.adaptyPaywall.name) {
+                    return PaywallController(
+                        purchaseService: purchaseService,
+                        paywallView: view,
+                        adaptyPaywallData: customPaywallData
+                    )
+                } else {
+                    return nil
+                }
+            case .adaptyBuilder(let adaptyBuilderData):
+                let proxy = AdaptyPaywallControllerDelegateProxy()
+                if let adaptyController = try? AdaptyUI.paywallController(
+                    for: adaptyBuilderData.adaptyPaywall,
+                    viewConfiguration: adaptyBuilderData.configuration,
+                    delegate: proxy
+                ) {
+                    return AdaptyPaywallControllerWrapper(
+                        wrappedController: adaptyController,
+                        purchaseService: purchaseService,
+                        proxy: proxy
+                    )
+                } else {
+                    return nil
+                }
+            }
         } else {
             return nil
         }
@@ -61,16 +103,39 @@ public class PaywallService: PaywallServiceProtocol {
     
     func fetchPaywallsAndProducts() async {
         let paywalls = await placements
-            .asyncMap { identifier in
-                if let paywall = try? await Adapty.getPaywall(placementId: identifier),
-                   let products = try? await Adapty.getPaywallProducts(paywall: paywall) {
-                    return PaywallAndProduct(placement: identifier, adaptyPaywall: paywall, products: products)
+            .asyncMap { identifier -> PaywallData? in
+                if let paywall = try? await Adapty.getPaywall(placementId: identifier) {
+                    if paywall.hasViewConfiguration {
+                        if let config = try? await AdaptyUI.getViewConfiguration(forPaywall: paywall) {
+                            return .adaptyBuilder(
+                                AdaptyBuilderData(
+                                    placement: identifier,
+                                    adaptyPaywall: paywall,
+                                    configuration: config
+                                )
+                            )
+                        } else {
+                            return nil
+                        }
+                    } else {
+                        if let products = try? await Adapty.getPaywallProducts(paywall: paywall) {
+                            return .customPaywall(
+                                CustomPaywallData(
+                                    placement: identifier,
+                                    adaptyPaywall: paywall,
+                                    products: products
+                                )
+                            )
+                        } else {
+                            return nil
+                        }
+                    }
                 } else {
                     return nil
                 }
             }
             .compactMap { $0 }
         
-        self.paywallsAndProducts = paywalls
+        self.paywallData = paywalls
     }
 }

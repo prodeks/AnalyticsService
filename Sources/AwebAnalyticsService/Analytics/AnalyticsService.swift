@@ -10,6 +10,7 @@ import BranchSDK
 import AdSupport
 import UserNotifications
 import Adapty
+import AdaptyUI
 import FirebaseMessaging
 
 public protocol AnalyticsServiceProtocol: AnyObject {
@@ -30,6 +31,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private let branch = Branch.getInstance()
     private let asaTools = ASATools.instance
     private let adapty = Adapty.self
+    private let adaptyUI = AdaptyUI.self
     
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
     
@@ -71,6 +73,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     
                     if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                         self.adapty.activate(key, customerUserId: userID)
+                        self.adaptyUI.activate()
                         
                         if let appInstanceId = Analytics.appInstanceID() {
                             let builder = AdaptyProfileParameters.Builder()

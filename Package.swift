@@ -26,7 +26,8 @@ let package = Package(
                 .product(name: "BranchSDK", package: "ios-branch-sdk-spm"),
                 .product(name: "ASATools", package: "ios_sdk"),
                 .product(name: "Lottie", package: "lottie-ios"),
-                .product(name: "Adapty", package: "AdaptySDK-iOS")
+                .product(name: "Adapty", package: "AdaptySDK-iOS"),
+                .product(name: "AdaptyUI", package: "AdaptySDK-iOS")
             ]
         )
     ]

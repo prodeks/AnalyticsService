@@ -5,6 +5,12 @@ public protocol URLConvertable {
     func url() -> URL?
 }
 
+extension URL: URLConvertable {
+    public func url() -> URL? {
+        return self
+    }
+}
+
 public class WebViewController: UIViewController {
     
     let webview = WKWebView()
