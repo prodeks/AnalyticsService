@@ -124,6 +124,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     
     public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchasedInfo: AdaptyPurchasedInfo) {
         purchaseService.isSubActive = true
+        dismissed?()
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
