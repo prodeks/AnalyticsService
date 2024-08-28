@@ -1,4 +1,4 @@
-import Foundation
+import UIKit
 
 public class PurchasesAndAnalytics {
 
@@ -7,7 +7,7 @@ public class PurchasesAndAnalytics {
     public lazy var paywalls = PaywallService(purchaseService: purchases)
     
     /// Set this value before accessing the `analytics`
-    public var dataFetchComplete: (() -> Void)?
+    public var dataFetchComplete: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
     
     private init() {
         purchases.logEvent = self.log
@@ -18,7 +18,7 @@ public class PurchasesAndAnalytics {
                 await self.paywalls.fetchPaywallsAndProducts()
                 await self.purchases.verifySubscriptionIfNeeded()
                 await MainActor.run {
-                    self.dataFetchComplete?()
+                    self.dataFetchComplete?(options)
                 }
             }
         }
