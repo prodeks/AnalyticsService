@@ -16,6 +16,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     
     func registerForNotifications()
     func log(e: EventProtocol)
+    func reqeuestATT()
 }
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
@@ -67,21 +68,18 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     }
     
     public func applicationDidBecomeActive(_ application: UIApplication) {
-        switch ATTrackingManager.trackingAuthorizationStatus {
-        case .notDetermined:
-            ATTrackingManager.requestTrackingAuthorization { status in
-                Log.printLog(l: .debug, str: "IDFA status: \(status)")
-                DispatchQueue.global(qos: .default).async {
-                    let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
-                    if #available(iOS 14.3, *) {
-                        if let token = try? AAAttribution.attributionToken() {
-                            
-                        }
-                    }
+        
+    }
+    
+    public func reqeuestATT() {
+        ATTrackingManager.requestTrackingAuthorization { status in
+            Log.printLog(l: .debug, str: "IDFA status: \(status)")
+            DispatchQueue.global(qos: .default).async {
+                let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
+                if let token = try? AAAttribution.attributionToken() {
+                    
                 }
             }
-        default:
-            break
         }
     }
     
