@@ -1,17 +1,10 @@
-import Foundation
-import FirebaseAnalytics
-import FirebaseCore
+import UIKit
 import AppTrackingTransparency
-import FacebookCore
 import AdServices
-import FirebaseAuth
-import ASATools
-import BranchSDK
 import AdSupport
 import UserNotifications
 import Adapty
 import AdaptyUI
-import FirebaseMessaging
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -27,9 +20,6 @@ public protocol AnalyticsServiceProtocol: AnyObject {
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
-    private let firebase = Analytics.self
-    private let branch = Branch.getInstance()
-    private let asaTools = ASATools.instance
     private let adapty = Adapty.self
     private let adaptyUI = AdaptyUI.self
     
@@ -39,62 +29,17 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         application: UIApplication,
         options: [UIApplication.LaunchOptionsKey: Any]?
     ) {
-        FirebaseApp.configure()
-        
-        if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
-            asaTools.attribute(apiToken: key) { response, error in
-                if let response {
-                    let firebaseProperties = response.analyticsValues()
-                    firebaseProperties.forEach { key, value in
-                        self.firebase.setUserProperty(String(describing: value), forName: key)
-                    }
-                    self.log(e: ASAAttributionEvent(params: firebaseProperties))
-                } else if let error = error {
-                    self.log(e: ASAAttributionErrorEvent(description: error.localizedDescription))
-                }
-            }
-        }
-        
-        ApplicationDelegate.shared.application(
-            application,
-            didFinishLaunchingWithOptions: options
-        )
-        
-        Messaging.messaging().delegate = self
-        
+                
         analyticsStarted?(options)
     }
     
     func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
         await withCheckedContinuation { c in
-            Auth.auth().signInAnonymously { result, error in
-                if let result {
-                    let userID = result.user.uid
-                    
-                    if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
-                        self.adapty.activate(key, customerUserId: userID)
-                        self.adaptyUI.activate()
-                        
-                        if let appInstanceId = Analytics.appInstanceID() {
-                            let builder = AdaptyProfileParameters.Builder()
-                                .with(firebaseAppInstanceId: appInstanceId)
-                                    
-                            self.adapty.updateProfile(params: builder.build()) { error in
-                                if let error {
-                                    Log.printLog(l: .analytics, str: error.localizedDescription)
-                                }
-                            }
-                        }
-                    }
-                    self.branch.setIdentity(userID)
-                    self.branch.initSession(launchOptions: options) { (params, error) in
-                        Log.printLog(l: .analytics, str: String(describing: params))
-                    }
-                    
-                    self.firebase.setUserID(userID)
-                }
-                c.resume()
+            if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
+                self.adapty.activate(key)
+                self.adaptyUI.activate()
             }
+            c.resume()
         }
     }
     
@@ -111,13 +56,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any]
     ) -> Bool {
-        branch.application(app, open: url, options: options)
-        return ApplicationDelegate.shared.application(
-            app,
-            open: url,
-            sourceApplication: options[UIApplication.OpenURLOptionsKey.sourceApplication] as? String,
-            annotation: options[UIApplication.OpenURLOptionsKey.annotation]
-        )
+        return true
     }
 
     public func application(
@@ -150,7 +89,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         continue userActivity: NSUserActivity
     ) -> Bool {
-        branch.continue(userActivity)
+        
         return true
     }
     
@@ -158,40 +97,12 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable : Any]
     ) {
-        branch.handlePushNotification(userInfo)
+        
     }
     
     public func log(e: EventProtocol) {
     
         Log.printLog(l: .analytics, str: e.name + " \(e.params)")
-        
-        firebase.logEvent(e.name, parameters: e.params)
-        
-        if let _ = e as? OnboardingStartedEvent {
-            let event = BranchEvent(name: e.name)
-            event.customData = [:]
-            event.logEvent()
-        }
-        
-        var fbParams: [AppEvents.ParameterName: Any] = [:]
-        e.params.forEach { k, v in
-            fbParams[AppEvents.ParameterName.init(k)] = v
-        }
-        
-        AppEvents.shared.logEvent(AppEvents.Name(e.name), parameters: fbParams)
-        
-        if let purchaseEvent = e as? PurchaseEvent,
-            case let .success(iap) = purchaseEvent {
-            AppEvents.shared.logPurchase(
-                amount: Double(iap.1),
-                currency: "USD"
-            )
-            let event = BranchEvent.standardEvent(.purchase)
-            event.currency = .USD
-            event.eventDescription = iap.0
-            event.revenue = NSDecimalNumber(value: iap.1)
-            event.logEvent()
-        }
     }
 }
 
@@ -211,13 +122,5 @@ extension AnalyticsService: UNUserNotificationCenterDelegate {
         let userInfo = notification.request.content.userInfo
         Log.printLog(l: .debug, str: "Will present notification, userInfo \n\(userInfo)")
         completionHandler([.banner, .badge, .sound])
-    }
-}
-
-extension AnalyticsService: MessagingDelegate {
-    public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        if let fcmToken {
-            Log.printLog(l: .debug, str: "Did receive FCM token - \(fcmToken)")
-        }
     }
 }
