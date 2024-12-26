@@ -56,14 +56,19 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
         forwarding?.paywallController(controller, didStartPurchase: product)
     }
     
-    func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: any AdaptyPaywallProduct, purchaseResult: AdaptyPurchaseResult) {
+    public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchasedInfo: AdaptyPurchasedInfo) {
         Log.printLog(l: .debug, str: #function)
-        forwarding?.paywallController(controller, didFinishPurchase: product, purchaseResult: purchaseResult)
+        forwarding?.paywallController(controller, didFinishPurchase: product, purchasedInfo: purchasedInfo)
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
         Log.printLog(l: .debug, str: #function)
         forwarding?.paywallController(controller, didFailPurchase: product, error: error)
+    }
+    
+    public func paywallController(_ controller: AdaptyPaywallController, didCancelPurchase product: AdaptyPaywallProduct) {
+        Log.printLog(l: .debug, str: #function)
+        forwarding?.paywallController(controller, didCancelPurchase: product)
     }
     
     public func paywallControllerDidStartRestore(_ controller: AdaptyPaywallController) {
@@ -109,7 +114,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         }
     }
     
-    func paywallController(_ controller: AdaptyPaywallController, didSelectProduct product: any AdaptyPaywallProductWithoutDeterminingOffer) {
+    public func paywallController(_ controller: AdaptyPaywallController, didSelectProduct product: AdaptyPaywallProduct) {
         
     }
     
@@ -117,13 +122,17 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         
     }
     
-    func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: any AdaptyPaywallProduct, purchaseResult: AdaptyPurchaseResult) {
-        purchaseService.isSubActive = purchaseResult.isPurchaseSuccess
+    public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchasedInfo: AdaptyPurchasedInfo) {
+        purchaseService.isSubActive = true
         dismissed?()
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
         presentCannotPurchaseAlert()
+    }
+    
+    public func paywallController(_ controller: AdaptyPaywallController, didCancelPurchase product: AdaptyPaywallProduct) {
+        
     }
     
     public func paywallControllerDidStartRestore(_ controller: AdaptyPaywallController) {

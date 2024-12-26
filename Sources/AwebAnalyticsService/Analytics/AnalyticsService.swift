@@ -77,14 +77,12 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                         self.adaptyUI.activate()
                         
                         if let appInstanceId = Analytics.appInstanceID() {
-                            Task {
-                                do {
-                                    try await Adapty.setIntegrationIdentifier(
-                                        key: "firebase_app_instance_id",
-                                        value: appInstanceId
-                                    )
-                                } catch {
-                                    Log.printLog(l: .error, str: error.localizedDescription)
+                            let builder = AdaptyProfileParameters.Builder()
+                                .with(firebaseAppInstanceId: appInstanceId)
+                                    
+                            self.adapty.updateProfile(params: builder.build()) { error in
+                                if let error {
+                                    Log.printLog(l: .analytics, str: error.localizedDescription)
                                 }
                             }
                         }

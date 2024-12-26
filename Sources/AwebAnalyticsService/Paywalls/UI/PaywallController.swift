@@ -65,12 +65,12 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     public func pricingData(_ iap: any IAPProtocol) -> PricingData? {
         return adaptyPaywallData.products
-            .first(where: { $0.vendorProductId == iap.productID })
+            .first(where: { $0.skProduct.productIdentifier == iap.productID })
             .flatMap { product in
                 PricingData(
-                    value: Double(truncating: product.price as NSNumber),
+                    value: Double(truncating: product.skProduct.price),
                     localizedPrice: product.localizedPrice ?? "",
-                    priceLocale: product.sk1Product!.priceLocale
+                    priceLocale: product.skProduct.priceLocale
                 )
             }
     }
@@ -89,7 +89,7 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     public func purchase(_ iap: any IAPProtocol) {
         self.overlayView.isHidden = false
-        if let product = adaptyPaywallData.products.first(where: { $0.vendorProductId == iap.productID }) {
+        if let product = adaptyPaywallData.products.first(where: { $0.skProduct.productIdentifier == iap.productID }) {
             purchaseService.purchaseAdaptyProduct(
                 product,
                 paywallID: paywallView.paywallID.rawValue
