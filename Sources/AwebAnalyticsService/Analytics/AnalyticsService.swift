@@ -136,11 +136,21 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     
     public func reqeuestATT() {
         ATTrackingManager.requestTrackingAuthorization { status in
-            Log.printLog(l: .debug, str: "IDFA status: \(status)")
+            let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
+            Task {
+                do {
+                    try await Adapty.updateProfile(params: builder.build())
+                } catch {
+                    Log.printLog(l: .error, str: error.localizedDescription)
+                }
+            }
             DispatchQueue.global(qos: .default).async {
                 let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
+                Log.printLog(l: .debug, str: "IDFA: \(idfa)")
+                let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
+                Log.printLog(l: .debug, str: "IDFV: \(idfv)")
                 if let token = try? AAAttribution.attributionToken() {
-                    
+                    Log.printLog(l: .debug, str: "AttributionToken: \(token)")
                 }
             }
         }
