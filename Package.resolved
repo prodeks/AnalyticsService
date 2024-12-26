@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/adaptyteam/AdaptySDK-iOS.git",
       "state" : {
-        "revision" : "17e83e15da4ff7e2f08b171aec24750123e47ee0",
-        "version" : "3.0.2"
+        "revision" : "a9522e6d677daf2e9491c2713ca686eaa2ee8aea",
+        "version" : "3.3.0"
       }
     },
     {
@@ -32,8 +32,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/facebook/facebook-ios-sdk",
       "state" : {
-        "revision" : "9ed465ccd73c231144d49a9c681774577c616f34",
-        "version" : "17.0.2"
+        "revision" : "619d1772808425faa010d92293b26eeb9bc1d630",
+        "version" : "17.4.0"
       }
     },
     {
@@ -41,8 +41,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/firebase/firebase-ios-sdk",
       "state" : {
-        "revision" : "a5c253d1b4409eb8aef4346015ba000f9935cb2d",
-        "version" : "11.0.0"
+        "revision" : "2e02253fd1ce99145bcbf1bb367ccf61bd0ca46b",
+        "version" : "11.6.0"
       }
     },
     {
@@ -50,8 +50,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/google/GoogleAppMeasurement.git",
       "state" : {
-        "revision" : "ca30c987b732d130732fb60b071e0b655a85ada7",
-        "version" : "11.0.0"
+        "revision" : "4f234bcbdae841d7015258fbbf8e7743a39b8200",
+        "version" : "11.4.0"
       }
     },
     {
@@ -104,8 +104,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/BranchMetrics/ios-branch-sdk-spm",
       "state" : {
-        "revision" : "1c9ae2eb035a6c4df36a0c5eaaa9258fb5b4e94c",
-        "version" : "3.4.3"
+        "revision" : "67b02bff0c21e257a3baeb65c73c4fb0ae62f29b",
+        "version" : "3.7.0"
       }
     },
     {
@@ -113,8 +113,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ASATools/ios_sdk.git",
       "state" : {
-        "revision" : "a6e80ed4eb56ecf63bfecfad92a5060291a7f85e",
-        "version" : "1.4.7"
+        "revision" : "622d7c1287fb223e55c6cc0978a1165700dd01ff",
+        "version" : "1.4.8"
       }
     },
     {

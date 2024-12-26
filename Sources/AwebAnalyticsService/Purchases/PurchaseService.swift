@@ -43,11 +43,11 @@ public class PurchaseService: PurchaseServiceProtocol {
                 completion(.success)
             case .failure(let error):
                 if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {
-                    self.logEvent?(PurchaseEvent.cancel(iap: (product.skProduct.productIdentifier, Float(truncating: product.skProduct.price))))
+                    self.logEvent?(PurchaseEvent.cancel(iap: (product.adaptyProductId, Float(truncating: product.price as NSNumber))))
                     self.logEvent?(PaywallCheckoutCancelledEvent(paywallID: paywallID))
                     completion(.cancel)
                 } else {
-                    self.logEvent?(PurchaseEvent.fail(iap: (product.skProduct.productIdentifier, error)))
+                    self.logEvent?(PurchaseEvent.fail(iap: (product.adaptyProductId, error)))
                     completion(.fail)
                 }
             }
