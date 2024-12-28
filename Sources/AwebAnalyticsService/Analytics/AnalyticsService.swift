@@ -12,6 +12,7 @@ import UserNotifications
 import Adapty
 import AdaptyUI
 import FirebaseMessaging
+import Combine
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -24,6 +25,8 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     func registerForNotifications()
     func log(e: EventProtocol)
     func reqeuestATT()
+    
+    var userID: AnyPublisher<String, Never> { get }
 }
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
@@ -33,6 +36,11 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private let asaTools = ASATools.instance
     private let adapty = Adapty.self
     private let adaptyUI = AdaptyUI.self
+    
+    @Published private var _userID = ""
+    public var userID: AnyPublisher<String, Never> {
+        $_userID.eraseToAnyPublisher()
+    }
     
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
     
@@ -71,7 +79,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             Auth.auth().signInAnonymously { result, error in
                 if let result {
                     let userID = result.user.uid
-                    
+                    self._userID = userID
                     if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                         self.adapty.activate(key, customerUserId: userID)
                         self.adaptyUI.activate()
