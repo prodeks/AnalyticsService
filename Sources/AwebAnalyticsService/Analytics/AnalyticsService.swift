@@ -32,7 +32,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
     private let firebase = Analytics.self
-    private let branch = Branch.getInstance()
+//    private let branch = Branch.getInstance()
     private let asaTools = ASATools.instance
     private let adapty = Adapty.self
     private let adaptyUI = AdaptyUI.self
@@ -95,10 +95,10 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                             }
                         }
                     }
-                    self.branch.setIdentity(userID)
-                    self.branch.initSession(launchOptions: options) { (params, error) in
-                        Log.printLog(l: .analytics, str: String(describing: params))
-                    }
+//                    self.branch.setIdentity(userID)
+//                    self.branch.initSession(launchOptions: options) { (params, error) in
+//                        Log.printLog(l: .analytics, str: String(describing: params))
+//                    }
                     
                     self.firebase.setUserID(userID)
                 }
@@ -120,7 +120,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any]
     ) -> Bool {
-        branch.application(app, open: url, options: options)
+//        branch.application(app, open: url, options: options)
         return ApplicationDelegate.shared.application(
             app,
             open: url,
@@ -166,7 +166,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         continue userActivity: NSUserActivity
     ) -> Bool {
-        branch.continue(userActivity)
+//        branch.continue(userActivity)
         return true
     }
     
@@ -174,7 +174,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable : Any]
     ) {
-        branch.handlePushNotification(userInfo)
+//        branch.handlePushNotification(userInfo)
     }
     
     public func log(e: EventProtocol) {
@@ -183,11 +183,11 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         
         firebase.logEvent(e.name, parameters: e.params)
         
-        if let _ = e as? OnboardingStartedEvent {
-            let event = BranchEvent(name: e.name)
-            event.customData = [:]
-            event.logEvent()
-        }
+//        if let _ = e as? OnboardingStartedEvent {
+//            let event = BranchEvent(name: e.name)
+//            event.customData = [:]
+//            event.logEvent()
+//        }
         
         var fbParams: [AppEvents.ParameterName: Any] = [:]
         e.params.forEach { k, v in
@@ -202,11 +202,11 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 amount: Double(iap.1),
                 currency: "USD"
             )
-            let event = BranchEvent.standardEvent(.purchase)
-            event.currency = .USD
-            event.eventDescription = iap.0
-            event.revenue = NSDecimalNumber(value: iap.1)
-            event.logEvent()
+//            let event = BranchEvent.standardEvent(.purchase)
+//            event.currency = .USD
+//            event.eventDescription = iap.0
+//            event.revenue = NSDecimalNumber(value: iap.1)
+//            event.logEvent()
         }
     }
 }
