@@ -42,12 +42,28 @@ public class PurchaseService: PurchaseServiceProtocol {
                 self.isSubActive = true
                 completion(.success)
             case .failure(let error):
+                var productIdentifier: String {
+                    if let sk2 = product.sk2Product {
+                        return sk2.id
+                    } else {
+                        return product.sk1Product?.productIdentifier ?? ""
+                    }
+                }
+                
+                var price: Float {
+                    if let sk2 = product.sk2Product {
+                        return Float(truncating: sk2.price as NSNumber)
+                    } else {
+                        return product.sk1Product?.price.floatValue ?? 0
+                    }
+                }
+                
                 if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {
-                    self.logEvent?(PurchaseEvent.cancel(iap: (product.skProduct.productIdentifier, Float(truncating: product.skProduct.price))))
+                    self.logEvent?(PurchaseEvent.cancel(iap: (productIdentifier, price)))
                     self.logEvent?(PaywallCheckoutCancelledEvent(paywallID: paywallID))
                     completion(.cancel)
                 } else {
-                    self.logEvent?(PurchaseEvent.fail(iap: (product.skProduct.productIdentifier, error)))
+                    self.logEvent?(PurchaseEvent.fail(iap: (productIdentifier, error)))
                     completion(.fail)
                 }
             }
