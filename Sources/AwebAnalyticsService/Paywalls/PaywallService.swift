@@ -20,6 +20,7 @@ public protocol PaywallServiceProtocol: AnyObject {
     var placements: Set<String> { get set }
     var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol?)? { get set }
     func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol?
+    func setFallbackPaywalls(url: URL)
 }
 
 enum PaywallData {
@@ -62,6 +63,10 @@ public class PaywallService: PaywallServiceProtocol {
     
     init(purchaseService: PurchaseService) {
         self.purchaseService = purchaseService
+    }
+    
+    public func setFallbackPaywalls(url: URL) {
+        Adapty.setFallbackPaywalls(fileURL: url)
     }
         
     public func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol? {
