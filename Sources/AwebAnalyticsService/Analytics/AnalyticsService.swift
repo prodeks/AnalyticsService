@@ -27,6 +27,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     func reqeuestATT()
     
     var userID: AnyPublisher<String, Never> { get }
+    var branchData: AnyPublisher<[AnyHashable : Any], Never> { get }
 }
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
@@ -40,6 +41,10 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     @Published private var _userID = ""
     public var userID: AnyPublisher<String, Never> {
         $_userID.eraseToAnyPublisher()
+    }
+    @Published private var _branchData = [AnyHashable : Any]()
+    public var branchData: AnyPublisher<[AnyHashable : Any], Never> {
+        $_branchData.eraseToAnyPublisher()
     }
     
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
@@ -98,6 +103,9 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     self.branch.setIdentity(userID)
                     self.branch.initSession(launchOptions: options) { (params, error) in
                         Log.printLog(l: .analytics, str: String(describing: params))
+                        if let params {
+                            self._branchData = params
+                        }
                     }
                     
                     self.firebase.setUserID(userID)
