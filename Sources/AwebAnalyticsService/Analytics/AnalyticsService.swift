@@ -79,39 +79,36 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         analyticsStarted?(options)
     }
     
-    func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
-        await withCheckedContinuation { c in
-            Auth.auth().signInAnonymously { result, error in
-                if let result {
-                    let userID = result.user.uid
-                    self._userID = userID
-                    if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
-                        self.adapty.activate(key, customerUserId: userID)
-                        self.adaptyUI.activate()
-                        
-                        if let appInstanceId = Analytics.appInstanceID() {
-                            let builder = AdaptyProfileParameters.Builder()
-                                .with(firebaseAppInstanceId: appInstanceId)
-                                    
-                            self.adapty.updateProfile(params: builder.build()) { error in
-                                if let error {
-                                    Log.printLog(l: .analytics, str: error.localizedDescription)
-                                }
-                            }
-                        }
-                    }
-                    self.branch.setIdentity(userID)
-                    self.branch.initSession(launchOptions: options) { (params, error) in
-                        Log.printLog(l: .analytics, str: String(describing: params))
-                        if let params {
-                            self._branchData = params
-                        }
-                    }
-                    
-                    self.firebase.setUserID(userID)
-                }
-                c.resume()
+    private func initBranchSession(launchOptions: [UIApplication.LaunchOptionsKey : Any]?) async -> [AnyHashable : Any] {
+        return await withCheckedContinuation { seal in
+            self.branch.initSession(launchOptions: launchOptions) { (params, error) in
+                Log.printLog(l: .analytics, str: String(describing: params))
+                let unwrap = params ?? [:]
+                seal.resume(returning: unwrap)
             }
+        }
+    }
+    
+    func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
+        do {
+            let signInResult = try await Auth.auth().signInAnonymously()
+            let userID = signInResult.user.uid
+            firebase.setUserID(userID)
+            _userID = userID
+            if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
+                try await adapty.activate(key, customerUserId: userID)
+                try await adaptyUI.activate()
+                
+                if let appInstanceId = Analytics.appInstanceID() {
+                    let builder = AdaptyProfileParameters.Builder().with(firebaseAppInstanceId: appInstanceId)
+                    try await adapty.updateProfile(params: builder.build())
+                }
+            }
+            branch.setIdentity(userID)
+            let branchData = await initBranchSession(launchOptions: options)
+            _branchData = branchData
+        } catch {
+            Log.printLog(l: .error, str: error.localizedDescription)
         }
     }
     
