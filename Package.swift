@@ -9,7 +9,7 @@ let package = Package(
     products: [.library(name: "AwebAnalyticsService", targets: ["AwebAnalyticsService"])],
     dependencies: [
         .package(url: "https://github.com/BranchMetrics/ios-branch-sdk-spm", exact: Version(3, 10, 0)),
-        .package(url: "https://github.com/facebook/facebook-ios-sdk", exact: Version(17, 0, 2)),
+        .package(url: "https://github.com/facebook/facebook-ios-sdk", exact: Version(18, 0, 0)),
         .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(11, 0, 0)),
         .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 4, 7)),
         .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 3)),
