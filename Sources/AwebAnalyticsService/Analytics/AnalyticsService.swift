@@ -24,7 +24,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     
     func registerForNotifications()
     func log(e: EventProtocol)
-    func reqeuestATT()
+    func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus
     
     var userID: AnyPublisher<String, Never> { get }
     var branchData: AnyPublisher<[AnyHashable : Any], Never> { get }
@@ -79,12 +79,12 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         analyticsStarted?(options)
     }
     
-    private func initBranchSession(launchOptions: [UIApplication.LaunchOptionsKey : Any]?) async -> [AnyHashable : Any] {
-        return await withCheckedContinuation { seal in
+    private func initBranchSession(launchOptions: [UIApplication.LaunchOptionsKey : Any]?) -> AsyncStream<[AnyHashable : Any]>  {
+        return AsyncStream { continuation in
             self.branch.initSession(launchOptions: launchOptions) { (params, error) in
                 Log.printLog(l: .analytics, str: String(describing: params))
                 let unwrap = params ?? [:]
-                seal.resume(returning: unwrap)
+                continuation.yield(unwrap)
             }
         }
     }
@@ -105,8 +105,11 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 }
             }
             branch.setIdentity(userID)
-            let branchData = await initBranchSession(launchOptions: options)
-            _branchData = branchData
+            Task {
+                for await value in initBranchSession(launchOptions: options) {
+                    _branchData = value
+                }
+            }
         } catch {
             Log.printLog(l: .error, str: error.localizedDescription)
         }
@@ -145,23 +148,26 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         
     }
     
-    public func reqeuestATT() {
-        ATTrackingManager.requestTrackingAuthorization { status in
-            let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
-            Task {
-                do {
-                    try await Adapty.updateProfile(params: builder.build())
-                } catch {
-                    Log.printLog(l: .error, str: error.localizedDescription)
+    public func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus {
+        return await withCheckedContinuation { c in
+            ATTrackingManager.requestTrackingAuthorization { status in
+                DispatchQueue.global(qos: .default).async {
+                    let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
+                    Log.printLog(l: .debug, str: "IDFA: \(idfa)")
+                    let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
+                    Log.printLog(l: .debug, str: "IDFV: \(idfv)")
+                    if let token = try? AAAttribution.attributionToken() {
+                        Log.printLog(l: .debug, str: "AttributionToken: \(token)")
+                    }
                 }
-            }
-            DispatchQueue.global(qos: .default).async {
-                let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
-                Log.printLog(l: .debug, str: "IDFA: \(idfa)")
-                let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
-                Log.printLog(l: .debug, str: "IDFV: \(idfv)")
-                if let token = try? AAAttribution.attributionToken() {
-                    Log.printLog(l: .debug, str: "AttributionToken: \(token)")
+                let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
+                Task {
+                    do {
+                        try await Adapty.updateProfile(params: builder.build())
+                        c.resume(returning: status)
+                    } catch {
+                        Log.printLog(l: .error, str: error.localizedDescription)
+                    }
                 }
             }
         }
