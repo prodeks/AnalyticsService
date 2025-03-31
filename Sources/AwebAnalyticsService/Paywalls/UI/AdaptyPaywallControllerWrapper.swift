@@ -3,7 +3,7 @@ import Adapty
 import AdaptyUI
 
 class AdaptyPaywallControllerWrapper: UIViewController, PaywallControllerProtocol {
-    var dismissed: (() -> Void)?
+    var dismissed: ((_ purchasedProductID: String?) -> Void)?
     var navigated: ((any PaywallPlacementProtocol) -> Void)?
     
     let wrappedController: AdaptyPaywallController
@@ -105,7 +105,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     public func paywallController(_ controller: AdaptyPaywallController, didPerform action: AdaptyUI.Action) {
         switch action {
         case .close:
-            dismissed?()
+            dismissed?(nil)
         case .openURL(let url):
             Log.printLog(l: .debug, str: "didPerform action with URL - \(url)")
             presentPolicyItem(url)
@@ -124,7 +124,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     
     public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchasedInfo: AdaptyPurchasedInfo) {
         purchaseService.isSubActive = true
-        dismissed?()
+        dismissed?(product.skProduct.productIdentifier)
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
@@ -143,7 +143,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         let hasSub = profile.accessLevels["premium"]?.isActive ?? false
         if hasSub {
             purchaseService.isSubActive = hasSub
-            dismissed?()
+            dismissed?(nil)
         } else {
             presentNoPurchasesToRestoreAlert()
         }
@@ -154,7 +154,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailRenderingWith error: AdaptyError) {
-        dismissed?()
+        dismissed?(nil)
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailLoadingProductsWith error: AdaptyError) -> Bool {

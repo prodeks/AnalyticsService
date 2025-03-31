@@ -5,7 +5,7 @@ import Adapty
 
 public class PaywallController: UIViewController, PaywallViewDelegateProtocol, UIViewControllerTransitioningDelegate, PaywallControllerProtocol {
     
-    public var dismissed: (() -> Void)?
+    public var dismissed: ((_ purchasedProductID: String?) -> Void)?
     public var navigated: ((PaywallPlacementProtocol) -> Void)?
     public var logOpen: (() -> Void)?
     public var logClose: (() -> Void)?
@@ -103,7 +103,8 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
                 case .fail:
                     self.presentCannotPurchaseAlert()
                 case .success:
-                    self.dismiss()
+                    self.logClose?()
+                    self.dismissed?(iap.productID)
                 }
             }
         } else {
@@ -126,7 +127,7 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     public func dismiss() {
         logClose?()
-        dismissed?()
+        dismissed?(nil)
     }
     
     func presentNoPurchasesToRestoreAlert() {

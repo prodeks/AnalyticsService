@@ -12,7 +12,7 @@ public protocol PaywallScreenProtocol: RawRepresentable where RawValue == String
 }
 
 public protocol PaywallControllerProtocol: UIViewController {
-    var dismissed: (() -> Void)? { get set }
+    var dismissed: ((_ purchasedProductID: String?) -> Void)? { get set }
     var navigated: ((PaywallPlacementProtocol) -> Void)? { get set }
 }
 
