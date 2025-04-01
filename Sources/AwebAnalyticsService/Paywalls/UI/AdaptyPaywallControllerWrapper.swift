@@ -56,19 +56,14 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
         forwarding?.paywallController(controller, didStartPurchase: product)
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchasedInfo: AdaptyPurchasedInfo) {
+    public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchaseResult: AdaptyPurchaseResult) {
         Log.printLog(l: .debug, str: #function)
-        forwarding?.paywallController(controller, didFinishPurchase: product, purchasedInfo: purchasedInfo)
+        forwarding?.paywallController(controller, didFinishPurchase: product, purchaseResult: purchaseResult)
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
         Log.printLog(l: .debug, str: #function)
         forwarding?.paywallController(controller, didFailPurchase: product, error: error)
-    }
-    
-    public func paywallController(_ controller: AdaptyPaywallController, didCancelPurchase product: AdaptyPaywallProduct) {
-        Log.printLog(l: .debug, str: #function)
-        forwarding?.paywallController(controller, didCancelPurchase: product)
     }
     
     public func paywallControllerDidStartRestore(_ controller: AdaptyPaywallController) {
@@ -114,7 +109,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         }
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didSelectProduct product: AdaptyPaywallProduct) {
+    func paywallController(
+        _ controller: AdaptyPaywallController,
+        didSelectProduct product: any AdaptyPaywallProductWithoutDeterminingOffer
+    ) {
         
     }
     
@@ -122,20 +120,33 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchasedInfo: AdaptyPurchasedInfo) {
+    public func paywallController(
+        _ controller: AdaptyPaywallController,
+        didFinishPurchase product: AdaptyPaywallProduct,
+        purchaseResult: AdaptyPurchaseResult
+    ) {
         purchaseService.isSubActive = true
-        dismissed?(product.skProduct.productIdentifier)
+        dismissed?(product.vendorProductId)
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
+    public func paywallController(
+        _ controller: AdaptyPaywallController,
+        didFailPurchase product: AdaptyPaywallProduct,
+        error: AdaptyError
+    ) {
         presentCannotPurchaseAlert()
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didCancelPurchase product: AdaptyPaywallProduct) {
+    public func paywallController(
+        _ controller: AdaptyPaywallController,
+        didCancelPurchase product: AdaptyPaywallProduct
+    ) {
         
     }
     
-    public func paywallControllerDidStartRestore(_ controller: AdaptyPaywallController) {
+    public func paywallControllerDidStartRestore(
+        _ controller: AdaptyPaywallController
+    ) {
         
     }
     
@@ -149,15 +160,24 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         }
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didFailRestoreWith error: AdaptyError) {
+    public func paywallController(
+        _ controller: AdaptyPaywallController,
+        didFailRestoreWith error: AdaptyError
+    ) {
         presentNoPurchasesToRestoreAlert()
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didFailRenderingWith error: AdaptyError) {
+    public func paywallController(
+        _ controller: AdaptyPaywallController,
+        didFailRenderingWith error: AdaptyError
+    ) {
         dismissed?(nil)
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didFailLoadingProductsWith error: AdaptyError) -> Bool {
+    public func paywallController(
+        _ controller: AdaptyPaywallController,
+        didFailLoadingProductsWith error: AdaptyError
+    ) -> Bool {
         return false
     }
     
