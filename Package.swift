@@ -10,9 +10,9 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/BranchMetrics/ios-branch-sdk-spm", exact: Version(3, 10, 0)),
         .package(url: "https://github.com/facebook/facebook-ios-sdk", exact: Version(18, 0, 0)),
-        .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(11, 0, 0)),
-        .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 4, 7)),
-        .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 3)),
+        .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(11, 11, 0)),
+        .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 5, 0)),
+        .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 5, 1)),
         .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(3, 4, 2)),
     ],
     targets: [
