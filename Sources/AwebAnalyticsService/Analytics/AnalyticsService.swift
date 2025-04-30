@@ -13,6 +13,7 @@ import AdaptyUI
 import FirebaseMessaging
 import Combine
 import AppsFlyerLib
+import PurchaseConnector
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -38,6 +39,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private let adapty = Adapty.self
     private let adaptyUI = AdaptyUI.self
     private let appsflyer = AppsFlyerLib.shared()
+    private let purchaseConnector = PurchaseConnector.shared()
     
     @Published private var _userID = ""
     public var userID: AnyPublisher<String, Never> {
@@ -59,6 +61,10 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             appsflyer.appleAppID = PurchasesAndAnalytics.Keys.appID ?? ""
             appsflyer.delegate = self
             appsflyer.deepLinkDelegate = self
+            purchaseConnector.purchaseRevenueDelegate = self
+            purchaseConnector.purchaseRevenueDataSource = self
+            purchaseConnector.autoLogPurchaseRevenue = .autoRenewableSubscriptions
+
             FirebaseApp.configure()
             
             if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
@@ -136,6 +142,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     }
     
     public func applicationDidBecomeActive(_ application: UIApplication) {
+        purchaseConnector.startObservingTransactions()
         appsflyer.start()
     }
     
@@ -234,7 +241,7 @@ extension AnalyticsService: MessagingDelegate {
     }
 }
 
-extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate {
+extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseRevenueDelegate, PurchaseRevenueDataSource {
     public func onConversionDataSuccess(_ conversionInfo: [AnyHashable : Any]) {
         _attributionData = conversionInfo
     }
@@ -247,5 +254,24 @@ extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate {
         if let deeplinkValue = result.deepLink?.deeplinkValue {
             _attributionData = [AnalyticsService.deepLinkValueKey: deeplinkValue]
         }
+    }
+    
+    public func didReceivePurchaseRevenueValidationInfo(
+        _ validationInfo: [AnyHashable : Any]?,
+        error: (any Error)?
+    ) {
+        if let validationInfo {
+            Log.printLog(l: .debug, str: "Purchase revenue validation info: \(validationInfo)")
+        }
+        if let error {
+            Log.printLog(l: .error, str: error.localizedDescription)
+        }
+    }
+    
+    public func purchaseRevenueAdditionalParameters(
+        for products: Set<SKProduct>,
+        transactions: Set<SKPaymentTransaction>?
+    ) -> [AnyHashable : Any]? {
+        return nil
     }
 }

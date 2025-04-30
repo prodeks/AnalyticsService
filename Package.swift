@@ -14,6 +14,7 @@ let package = Package(
         .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 4, 7)),
         .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 4, 3)),
         .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(3, 1, 0)),
+        .package(url: "https://github.com/AppsFlyerSDK/PurchaseConnector-Dynamic", exact: .init(6, 15, 3))
     ],
     targets: [
         .target(
@@ -28,7 +29,8 @@ let package = Package(
                 .product(name: "ASATools", package: "ios_sdk"),
                 .product(name: "Lottie", package: "lottie-ios"),
                 .product(name: "Adapty", package: "AdaptySDK-iOS"),
-                .product(name: "AdaptyUI", package: "AdaptySDK-iOS")
+                .product(name: "AdaptyUI", package: "AdaptySDK-iOS"),
+                .product(name: "PurchaseConnector-Dynamic", package: "PurchaseConnector-Dynamic"),
             ]
         )
     ]
