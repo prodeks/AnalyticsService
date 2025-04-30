@@ -6,13 +6,13 @@ import FacebookCore
 import AdServices
 import FirebaseAuth
 import ASATools
-import BranchSDK
 import AdSupport
 import UserNotifications
 import Adapty
 import AdaptyUI
 import FirebaseMessaging
 import Combine
+import AppsFlyerLib
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -27,65 +27,62 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus
     
     var userID: AnyPublisher<String, Never> { get }
-    var branchData: AnyPublisher<[AnyHashable : Any], Never> { get }
+    var attributionData: AnyPublisher<[AnyHashable : Any], Never> { get }
 }
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
+    public static let deepLinkValueKey = "deepLinkValue"
     private let firebase = Analytics.self
-    private let branch = Branch.getInstance()
     private let asaTools = ASATools.instance
     private let adapty = Adapty.self
     private let adaptyUI = AdaptyUI.self
+    private let appsflyer = AppsFlyerLib.shared()
     
     @Published private var _userID = ""
     public var userID: AnyPublisher<String, Never> {
         $_userID.eraseToAnyPublisher()
     }
-    @Published private var _branchData = [AnyHashable : Any]()
-    public var branchData: AnyPublisher<[AnyHashable : Any], Never> {
-        $_branchData.eraseToAnyPublisher()
+    @Published private var _attributionData = [AnyHashable : Any]()
+    public var attributionData: AnyPublisher<[AnyHashable : Any], Never> {
+        $_attributionData.eraseToAnyPublisher()
     }
     
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
     
-    @MainActor public func didFinishLaunchingWithOptions(
+    public func didFinishLaunchingWithOptions(
         application: UIApplication,
         options: [UIApplication.LaunchOptionsKey: Any]?
     ) {
-        FirebaseApp.configure()
-        
-        if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
-            asaTools.attribute(apiToken: key) { response, error in
-                if let response {
-                    let firebaseProperties = response.analyticsValues()
-                    firebaseProperties.forEach { key, value in
-                        self.firebase.setUserProperty(String(describing: value), forName: key)
+        Task { @MainActor in
+            appsflyer.appsFlyerDevKey = PurchasesAndAnalytics.Keys.appsflyerKey ?? ""
+            appsflyer.appleAppID = PurchasesAndAnalytics.Keys.appID ?? ""
+            appsflyer.delegate = self
+            appsflyer.deepLinkDelegate = self
+            FirebaseApp.configure()
+            
+            if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
+                asaTools.attribute(apiToken: key) { response, error in
+                    if let response {
+                        let firebaseProperties = response.analyticsValues()
+                        firebaseProperties.forEach { key, value in
+                            self.firebase.setUserProperty(String(describing: value), forName: key)
+                        }
+                        self.log(e: ASAAttributionEvent(params: firebaseProperties))
+                    } else if let error = error {
+                        self.log(e: ASAAttributionErrorEvent(description: error.localizedDescription))
                     }
-                    self.log(e: ASAAttributionEvent(params: firebaseProperties))
-                } else if let error = error {
-                    self.log(e: ASAAttributionErrorEvent(description: error.localizedDescription))
                 }
             }
-        }
-        
-        ApplicationDelegate.shared.application(
-            application,
-            didFinishLaunchingWithOptions: options
-        )
-        
-        Messaging.messaging().delegate = self
-        
-        analyticsStarted?(options)
-    }
-    
-    private func initBranchSession(launchOptions: [UIApplication.LaunchOptionsKey : Any]?) -> AsyncStream<[AnyHashable : Any]>  {
-        return AsyncStream { continuation in
-            self.branch.initSession(launchOptions: launchOptions) { (params, error) in
-                Log.printLog(l: .analytics, str: String(describing: params))
-                let unwrap = params ?? [:]
-                continuation.yield(unwrap)
-            }
+            
+            ApplicationDelegate.shared.application(
+                application,
+                didFinishLaunchingWithOptions: options
+            )
+            
+            Messaging.messaging().delegate = self
+            
+            analyticsStarted?(options)
         }
     }
     
@@ -95,6 +92,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             let userID = signInResult.user.uid
             firebase.setUserID(userID)
             _userID = userID
+            appsflyer.customerUserID = userID
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                 try await adapty.activate(key, customerUserId: userID)
                 try await adaptyUI.activate()
@@ -102,12 +100,6 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 if let appInstanceId = Analytics.appInstanceID() {
                     let builder = AdaptyProfileParameters.Builder().with(firebaseAppInstanceId: appInstanceId)
                     try await adapty.updateProfile(params: builder.build())
-                }
-            }
-            branch.setIdentity(userID)
-            Task {
-                for await value in initBranchSession(launchOptions: options) {
-                    _branchData = value
                 }
             }
         } catch {
@@ -128,7 +120,6 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any]
     ) -> Bool {
-        branch.application(app, open: url, options: options)
         return ApplicationDelegate.shared.application(
             app,
             open: url,
@@ -145,7 +136,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     }
     
     public func applicationDidBecomeActive(_ application: UIApplication) {
-        
+        appsflyer.start()
     }
     
     public func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus {
@@ -177,15 +168,16 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         continue userActivity: NSUserActivity
     ) -> Bool {
-        branch.continue(userActivity)
         return true
     }
     
-    @MainActor public func application(
+    public func application(
         _application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable : Any]
     ) {
-        branch.handlePushNotification(userInfo)
+        Task { @MainActor in
+            
+        }
     }
     
     public func log(e: EventProtocol) {
@@ -193,12 +185,6 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         Log.printLog(l: .analytics, str: e.name + " \(e.params)")
         
         firebase.logEvent(e.name, parameters: e.params)
-        
-        if let _ = e as? OnboardingStartedEvent {
-            let event = BranchEvent(name: e.name)
-            event.customData = [:]
-            event.logEvent()
-        }
         
         var fbParams: [AppEvents.ParameterName: Any] = [:]
         e.params.forEach { k, v in
@@ -213,31 +199,30 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 amount: Double(iap.1),
                 currency: "USD"
             )
-            let event = BranchEvent.standardEvent(.purchase)
-            event.currency = .USD
-            event.eventDescription = iap.0
-            event.revenue = NSDecimalNumber(value: iap.1)
-            event.logEvent()
         }
     }
 }
 
 extension AnalyticsService: UNUserNotificationCenterDelegate {
-    @MainActor public func userNotificationCenter(
+    public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        completionHandler()
+        Task { @MainActor in
+            completionHandler()
+        }
     }
-    @MainActor public func userNotificationCenter(
+    public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        let userInfo = notification.request.content.userInfo
-        Log.printLog(l: .debug, str: "Will present notification, userInfo \n\(userInfo)")
-        completionHandler([.banner, .badge, .sound])
+        Task { @MainActor in
+            let userInfo = notification.request.content.userInfo
+            Log.printLog(l: .debug, str: "Will present notification, userInfo \n\(userInfo)")
+            completionHandler([.banner, .badge, .sound])
+        }
     }
 }
 
@@ -245,6 +230,22 @@ extension AnalyticsService: MessagingDelegate {
     public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         if let fcmToken {
             Log.printLog(l: .debug, str: "Did receive FCM token - \(fcmToken)")
+        }
+    }
+}
+
+extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate {
+    public func onConversionDataSuccess(_ conversionInfo: [AnyHashable : Any]) {
+        _attributionData = conversionInfo
+    }
+    
+    public func onConversionDataFail(_ error: any Error) {
+        Log.printLog(l: .error, str: error.localizedDescription)
+    }
+
+    public func didResolveDeepLink(_ result: DeepLinkResult) {
+        if let deeplinkValue = result.deepLink?.deeplinkValue {
+            _attributionData = [AnalyticsService.deepLinkValueKey: deeplinkValue]
         }
     }
 }
