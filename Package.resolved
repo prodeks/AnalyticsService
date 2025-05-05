@@ -154,6 +154,15 @@
       }
     },
     {
+      "identity" : "purchaseconnector-dynamic",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/AppsFlyerSDK/PurchaseConnector-Dynamic",
+      "state" : {
+        "revision" : "ca5904124875785fc179070fe7b8eec619368e31",
+        "version" : "6.15.3"
+      }
+    },
+    {
       "identity" : "swift-protobuf",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-protobuf.git",
