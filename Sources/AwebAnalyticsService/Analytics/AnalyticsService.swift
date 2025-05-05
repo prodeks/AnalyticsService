@@ -140,28 +140,31 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     }
     
     public func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus {
-        return await withCheckedContinuation { c in
-            ATTrackingManager.requestTrackingAuthorization { status in
-                DispatchQueue.global(qos: .default).async {
-                    let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
-                    Log.printLog(l: .debug, str: "IDFA: \(idfa)")
-                    let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
-                    Log.printLog(l: .debug, str: "IDFV: \(idfv)")
-                    if let token = try? AAAttribution.attributionToken() {
-                        Log.printLog(l: .debug, str: "AttributionToken: \(token)")
+        let result = await withTimeout(seconds: 2) {
+            await withCheckedContinuation { c in
+                ATTrackingManager.requestTrackingAuthorization { status in
+                    DispatchQueue.global(qos: .default).async {
+                        let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
+                        Log.printLog(l: .debug, str: "IDFA: \(idfa)")
+                        let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
+                        Log.printLog(l: .debug, str: "IDFV: \(idfv)")
+                        if let token = try? AAAttribution.attributionToken() {
+                            Log.printLog(l: .debug, str: "AttributionToken: \(token)")
+                        }
                     }
-                }
-                let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
-                Task {
-                    do {
-                        try await Adapty.updateProfile(params: builder.build())
-                        c.resume(returning: status)
-                    } catch {
-                        Log.printLog(l: .error, str: error.localizedDescription)
+                    let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
+                    Task {
+                        do {
+                            try await Adapty.updateProfile(params: builder.build())
+                            c.resume(returning: status)
+                        } catch {
+                            Log.printLog(l: .error, str: error.localizedDescription)
+                        }
                     }
                 }
             }
         }
+        return result ?? .notDetermined
     }
     
     public func application(

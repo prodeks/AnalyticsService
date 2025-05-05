@@ -14,9 +14,11 @@ public class PurchasesAndAnalytics {
         
         analytics.analyticsStarted = { options in
             Task {
-                await self.analytics.firebaseSignIn(options)
-                await self.paywalls.fetchPaywallsAndProducts()
-                await self.purchases.verifySubscriptionIfNeeded()
+                await withTimeout(seconds: 5) {
+                    await self.analytics.firebaseSignIn(options)
+                    await self.paywalls.fetchPaywallsAndProducts()
+                    await self.purchases.verifySubscriptionIfNeeded()
+                }
                 await MainActor.run {
                     self.dataFetchComplete?(options)
                 }
