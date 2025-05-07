@@ -61,6 +61,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             appsflyer.appleAppID = PurchasesAndAnalytics.Keys.appID ?? ""
             appsflyer.delegate = self
             appsflyer.deepLinkDelegate = self
+            appsflyer.isDebug = true
             purchaseConnector.purchaseRevenueDelegate = self
             purchaseConnector.purchaseRevenueDataSource = self
             purchaseConnector.autoLogPurchaseRevenue = .autoRenewableSubscriptions
@@ -142,8 +143,8 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     }
     
     public func applicationDidBecomeActive(_ application: UIApplication) {
-        purchaseConnector.startObservingTransactions()
         appsflyer.start()
+        purchaseConnector.startObservingTransactions()
     }
     
     public func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus {
@@ -210,6 +211,8 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 currency: "USD"
             )
         }
+        
+        appsflyer.logEvent(e.name, withValues: e.params)
     }
 }
 
