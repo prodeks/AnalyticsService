@@ -33,7 +33,6 @@ public protocol AnalyticsServiceProtocol: AnyObject {
 
 public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
-    public static let deepLinkValueKey = "deepLinkValue"
     private let firebase = Analytics.self
     private let asaTools = ASATools.instance
     private let adapty = Adapty.self
