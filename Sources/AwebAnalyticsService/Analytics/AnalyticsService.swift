@@ -255,7 +255,7 @@ extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseReve
 
     public func didResolveDeepLink(_ result: DeepLinkResult) {
         if let deeplinkValue = result.deepLink?.deeplinkValue {
-            _attributionData = [AnalyticsService.deepLinkValueKey: deeplinkValue]
+            _attributionData = ["deep_link_value": deeplinkValue]
         }
     }
     
