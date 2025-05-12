@@ -62,6 +62,7 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             appsflyer.delegate = self
             appsflyer.deepLinkDelegate = self
             appsflyer.isDebug = true
+            appsflyer.waitForATTUserAuthorization(timeoutInterval: 60)
             purchaseConnector.purchaseRevenueDelegate = self
             purchaseConnector.purchaseRevenueDataSource = self
             purchaseConnector.autoLogPurchaseRevenue = .autoRenewableSubscriptions
@@ -148,31 +149,28 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     }
     
     public func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus {
-        let result = await withTimeout(seconds: 2) {
-            await withCheckedContinuation { c in
-                ATTrackingManager.requestTrackingAuthorization { status in
-                    DispatchQueue.global(qos: .default).async {
-                        let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
-                        Log.printLog(l: .debug, str: "IDFA: \(idfa)")
-                        let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
-                        Log.printLog(l: .debug, str: "IDFV: \(idfv)")
-                        if let token = try? AAAttribution.attributionToken() {
-                            Log.printLog(l: .debug, str: "AttributionToken: \(token)")
-                        }
+        return await withCheckedContinuation { c in
+            ATTrackingManager.requestTrackingAuthorization { status in
+                DispatchQueue.global(qos: .default).async {
+                    let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
+                    Log.printLog(l: .debug, str: "IDFA: \(idfa)")
+                    let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
+                    Log.printLog(l: .debug, str: "IDFV: \(idfv)")
+                    if let token = try? AAAttribution.attributionToken() {
+                        Log.printLog(l: .debug, str: "AttributionToken: \(token)")
                     }
-                    let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
-                    Task {
-                        do {
-                            try await Adapty.updateProfile(params: builder.build())
-                            c.resume(returning: status)
-                        } catch {
-                            Log.printLog(l: .error, str: error.localizedDescription)
-                        }
+                }
+                let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
+                Task {
+                    do {
+                        try await Adapty.updateProfile(params: builder.build())
+                        c.resume(returning: status)
+                    } catch {
+                        Log.printLog(l: .error, str: error.localizedDescription)
                     }
                 }
             }
         }
-        return result ?? .notDetermined
     }
     
     public func application(
