@@ -1,6 +1,6 @@
 import UIKit
 
-public class PurchasesAndAnalytics {
+@MainActor public class PurchasesAndAnalytics {
 
     public lazy var analytics = AnalyticsService()
     public lazy var purchases = PurchaseService()

@@ -16,7 +16,7 @@ public protocol PaywallControllerProtocol: UIViewController {
     var navigated: ((PaywallPlacementProtocol) -> Void)? { get set }
 }
 
-public protocol PaywallServiceProtocol: AnyObject {
+@MainActor public protocol PaywallServiceProtocol: AnyObject {
     var placements: Set<String> { get set }
     var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol?)? { get set }
     func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol?
@@ -40,7 +40,7 @@ enum PaywallData {
 struct AdaptyBuilderData {
     let placement: String
     let adaptyPaywall: AdaptyPaywall
-    let configuration: AdaptyUI.LocalizedViewConfiguration
+    let configuration: AdaptyUI.PaywallConfiguration
 }
 
 struct CustomPaywallData {
@@ -87,9 +87,9 @@ public class PaywallService: PaywallServiceProtocol {
                 }
             case .adaptyBuilder(let adaptyBuilderData):
                 let proxy = AdaptyPaywallControllerDelegateProxy()
+                
                 if let adaptyController = try? AdaptyUI.paywallController(
-                    for: adaptyBuilderData.adaptyPaywall,
-                    viewConfiguration: adaptyBuilderData.configuration,
+                    with: adaptyBuilderData.configuration,
                     delegate: proxy
                 ) {
                     return AdaptyPaywallControllerWrapper(
@@ -110,8 +110,8 @@ public class PaywallService: PaywallServiceProtocol {
         let paywalls = await placements
             .asyncMap { identifier -> PaywallData? in
                 if let paywall = try? await Adapty.getPaywall(placementId: identifier) {
-                    if paywall.hasViewConfiguration {
-                        if let config = try? await AdaptyUI.getViewConfiguration(forPaywall: paywall) {
+                    if paywall.hasViewConfiguration { 
+                        if let config = try? await AdaptyUI.getPaywallConfiguration(forPaywall: paywall) {
                             return .adaptyBuilder(
                                 AdaptyBuilderData(
                                     placement: identifier,
