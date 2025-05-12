@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/adaptyteam/AdaptySDK-iOS.git",
       "state" : {
-        "revision" : "10882c9d2a25555daec0c9cae14df6a4747ad11d",
-        "version" : "3.4.2"
+        "revision" : "fcc8729a7e332d5403ae88bb34bfadaff3c30000",
+        "version" : "3.1.0"
       }
     },
     {
@@ -28,12 +28,12 @@
       }
     },
     {
-      "identity" : "appsflyerframework",
+      "identity" : "appsflyerframework-dynamic",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AppsFlyerSDK/AppsFlyerFramework",
+      "location" : "https://github.com/AppsFlyerSDK/AppsFlyerFramework-Dynamic",
       "state" : {
-        "revision" : "88269d96aed888416e5fabbe983f769aa9013d5c",
-        "version" : "6.17.0"
+        "revision" : "3e977098a4c3caa0697b39544ccad116cf1d5707",
+        "version" : "6.15.2"
       }
     },
     {

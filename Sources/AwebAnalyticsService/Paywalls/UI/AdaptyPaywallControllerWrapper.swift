@@ -55,10 +55,18 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
         Log.printLog(l: .debug, str: #function)
         forwarding?.paywallController(controller, didStartPurchase: product)
     }
-    
-    public func paywallController(_ controller: AdaptyPaywallController, didFinishPurchase product: AdaptyPaywallProduct, purchaseResult: AdaptyPurchaseResult) {
+  
+    func paywallController(
+        _ controller: AdaptyPaywallController,
+        didFinishPurchase product: AdaptyPaywallProduct,
+        purchasedInfo: AdaptyPurchasedInfo
+    ) {
         Log.printLog(l: .debug, str: #function)
-        forwarding?.paywallController(controller, didFinishPurchase: product, purchaseResult: purchaseResult)
+        forwarding?.paywallController(
+            controller,
+            didFinishPurchase: product,
+            purchasedInfo: purchasedInfo
+        )
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
@@ -111,21 +119,20 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     
     func paywallController(
         _ controller: AdaptyPaywallController,
-        didSelectProduct product: any AdaptyPaywallProductWithoutDeterminingOffer
-    ) {
+        didSelectProduct product: AdaptyPaywallProduct) {
         
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didStartPurchase product: AdaptyPaywallProduct) {
         
     }
-    
-    public func paywallController(
+  
+    func paywallController(
         _ controller: AdaptyPaywallController,
         didFinishPurchase product: AdaptyPaywallProduct,
-        purchaseResult: AdaptyPurchaseResult
+        purchasedInfo: AdaptyPurchasedInfo
     ) {
-        purchaseService.isSubActive = true
+        purchaseService.isSubActive = purchasedInfo.profile.accessLevels["premium"]?.isActive ?? false
         dismissed?(product.vendorProductId)
     }
     
