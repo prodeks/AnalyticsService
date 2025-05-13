@@ -247,6 +247,23 @@ extension AnalyticsService: MessagingDelegate {
 extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseRevenueDelegate, PurchaseRevenueDataSource {
     public func onConversionDataSuccess(_ conversionInfo: [AnyHashable : Any]) {
         _attributionData = conversionInfo
+        
+        let afUID = AppsFlyerLib.shared().getAppsFlyerUID()
+        let mediaSource = conversionInfo["media_source"] as? String ?? ""
+        let campaign    = conversionInfo["campaign"] as? String ?? ""
+        
+        Task {
+            do {
+                let builder = try AdaptyProfileParameters.Builder()
+                    .with(appTrackingTransparencyStatus: ATTrackingManager.trackingAuthorizationStatus)
+                    .with(customAttribute: afUID, forKey: "af_uid")
+                    .with(customAttribute: mediaSource, forKey: "af_media_source")
+                    .with(customAttribute: campaign, forKey: "af_campaign")
+                try await Adapty.updateProfile(params: builder.build())
+            } catch {
+                Log.printLog(l: .error, str: error.localizedDescription)
+            }
+        }
     }
     
     public func onConversionDataFail(_ error: any Error) {
