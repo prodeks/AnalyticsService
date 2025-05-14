@@ -40,7 +40,7 @@ enum PaywallData {
 struct AdaptyBuilderData {
     let placement: String
     let adaptyPaywall: AdaptyPaywall
-    let configuration: AdaptyUI.LocalizedViewConfiguration
+    let configuration: AdaptyUI.PaywallConfiguration
 }
 
 struct CustomPaywallData {
@@ -87,10 +87,8 @@ public class PaywallService: PaywallServiceProtocol {
                 }
             case .adaptyBuilder(let adaptyBuilderData):
                 let proxy = AdaptyPaywallControllerDelegateProxy()
-                
                 if let adaptyController = try? AdaptyUI.paywallController(
-                    for: adaptyBuilderData.adaptyPaywall,
-                    viewConfiguration: adaptyBuilderData.configuration,
+                    with: adaptyBuilderData.configuration,
                     delegate: proxy
                 ) {
                     return AdaptyPaywallControllerWrapper(
@@ -112,7 +110,7 @@ public class PaywallService: PaywallServiceProtocol {
             .asyncMap { identifier -> PaywallData? in
                 if let paywall = try? await Adapty.getPaywall(placementId: identifier) {
                     if paywall.hasViewConfiguration {
-                        if let config = try? await AdaptyUI.getViewConfiguration(forPaywall: paywall) {
+                        if let config = try? await AdaptyUI.getPaywallConfiguration(forPaywall: paywall) {
                             return .adaptyBuilder(
                                 AdaptyBuilderData(
                                     placement: identifier,
