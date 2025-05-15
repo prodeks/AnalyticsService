@@ -38,9 +38,15 @@ public class PurchaseService: PurchaseServiceProtocol {
         self.logEvent?(PaywallCheckoutStartedEvent(paywallID: paywallID))
         Adapty.makePurchase(product: product) { purchaseResult in
             switch purchaseResult {
-            case .success:
-                self.isSubActive = true
-                completion(.success)
+            case .success(let result):
+                if result.isPurchaseCancelled {
+                    completion(.cancel)
+                    self.logEvent?(PurchaseEvent.cancel(iap: (product.vendorProductId, Float(truncating: product.price as NSNumber))))
+                    self.logEvent?(PaywallCheckoutCancelledEvent(paywallID: paywallID))
+                } else {
+                    self.isSubActive = true
+                    completion(.success)
+                }
             case .failure(let error):
                 if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {
                     self.logEvent?(PurchaseEvent.cancel(iap: (product.vendorProductId, Float(truncating: product.price as NSNumber))))
