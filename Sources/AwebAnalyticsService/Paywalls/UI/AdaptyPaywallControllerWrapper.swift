@@ -58,15 +58,16 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
   
     func paywallController(
         _ controller: AdaptyPaywallController,
-        didFinishPurchase product: AdaptyPaywallProduct,
-        purchasedInfo: AdaptyPurchasedInfo
+        didFinishPurchase product: any AdaptyPaywallProduct,
+        purchaseResult: AdaptyPurchaseResult
     ) {
         Log.printLog(l: .debug, str: #function)
-        forwarding?.paywallController(
-            controller,
-            didFinishPurchase: product,
-            purchasedInfo: purchasedInfo
-        )
+        forwarding?
+            .paywallController(
+                controller,
+                didFinishPurchase: product,
+                purchaseResult: purchaseResult
+            )
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFailPurchase product: AdaptyPaywallProduct, error: AdaptyError) {
@@ -129,10 +130,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
   
     func paywallController(
         _ controller: AdaptyPaywallController,
-        didFinishPurchase product: AdaptyPaywallProduct,
-        purchasedInfo: AdaptyPurchasedInfo
+        didFinishPurchase product: any AdaptyPaywallProduct,
+        purchaseResult: AdaptyPurchaseResult
     ) {
-        purchaseService.isSubActive = purchasedInfo.profile.accessLevels["premium"]?.isActive ?? false
+        purchaseService.isSubActive = purchaseResult.isPurchaseSuccess
         dismissed?(product.vendorProductId)
     }
     

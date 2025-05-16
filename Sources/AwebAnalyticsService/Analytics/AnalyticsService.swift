@@ -105,8 +105,10 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 try await adaptyUI.activate()
                 
                 if let appInstanceId = Analytics.appInstanceID() {
-                    let builder = AdaptyProfileParameters.Builder().with(firebaseAppInstanceId: appInstanceId)
-                    try await Adapty.updateProfile(params: builder.build())
+                    try? await Adapty.setIntegrationIdentifier(
+                        key: "firebase_app_instance_id",
+                        value: appInstanceId
+                    )
                 }
             }
         } catch {
@@ -249,21 +251,8 @@ extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseReve
         _attributionData = conversionInfo
         
         let afUID = AppsFlyerLib.shared().getAppsFlyerUID()
-        let mediaSource = conversionInfo["media_source"] as? String ?? ""
-        let campaign    = conversionInfo["campaign"] as? String ?? ""
-        
-        Task {
-            do {
-                let builder = try AdaptyProfileParameters.Builder()
-                    .with(appTrackingTransparencyStatus: ATTrackingManager.trackingAuthorizationStatus)
-                    .with(customAttribute: afUID, forKey: "af_uid")
-                    .with(customAttribute: mediaSource, forKey: "af_media_source")
-                    .with(customAttribute: campaign, forKey: "af_campaign")
-                try await Adapty.updateProfile(params: builder.build())
-            } catch {
-                Log.printLog(l: .error, str: error.localizedDescription)
-            }
-        }
+        Adapty.setIntegrationIdentifier(key: "appsflyer_id", value: afUID)
+        Adapty.updateAttribution(conversionInfo, source: "appsflyer")
     }
     
     public func onConversionDataFail(_ error: any Error) {

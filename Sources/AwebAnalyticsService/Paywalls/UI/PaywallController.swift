@@ -70,7 +70,7 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
                 PricingData(
                     value: Double(truncating: product.price as NSNumber),
                     localizedPrice: product.localizedPrice ?? "",
-                    priceLocale: product.skProduct.priceLocale /*?? product.regionCode.map(Locale.init(identifier:)) ?? Locale.current*/,
+                    priceLocale: product.priceLocale,
                     currencySymbol: product.currencySymbol ?? ""
                 )
             }
