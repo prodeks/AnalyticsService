@@ -7,5 +7,6 @@ extension PurchasesAndAnalytics {
         public static var sharedSecret: String?
         public static var appsflyerKey: String?
         public static var appID: String?
+        public static var mixPanelToken: String?
     }
 }

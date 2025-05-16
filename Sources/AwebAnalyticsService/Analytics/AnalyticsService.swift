@@ -14,6 +14,7 @@ import FirebaseMessaging
 import Combine
 import AppsFlyerLib
 import PurchaseConnector
+import Mixpanel
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -68,6 +69,9 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
             FirebaseApp.configure()
             
+            Mixpanel.initialize(token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "", trackAutomaticEvents: false)
+            Mixpanel.mainInstance().loggingEnabled = true
+            
             if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
                 asaTools.attribute(apiToken: key) { response, error in
                     if let response {
@@ -110,6 +114,11 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                         value: appInstanceId
                     )
                 }
+                
+                try await Adapty.setIntegrationIdentifier(
+                    key: "mixpanel_user_id",
+                    value: Mixpanel.mainInstance().distinctId
+                )
             }
         } catch {
             Log.printLog(l: .error, str: error.localizedDescription)
@@ -212,6 +221,9 @@ public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         }
         
         appsflyer.logEvent(e.name, withValues: e.params)
+        
+        let params = e.params.mapValues { String.init(describing: $0) }
+        Mixpanel.mainInstance().track(event: e.name, properties: params)
     }
 }
 
