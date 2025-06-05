@@ -15,6 +15,7 @@ import Combine
 import AppsFlyerLib
 import PurchaseConnector
 import Mixpanel
+import FirebaseFirestore
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
