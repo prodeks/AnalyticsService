@@ -22,6 +22,7 @@ let package = Package(
             name: "AwebAnalyticsService",
             dependencies: [
                 .product(name: "FacebookCore", package: "facebook-ios-sdk"),
+                .product(name: "FirebaseRemoteConfig", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseAnalytics", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseCrashlytics", package: "firebase-ios-sdk"),
