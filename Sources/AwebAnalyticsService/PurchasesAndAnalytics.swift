@@ -2,29 +2,36 @@ import UIKit
 
 @MainActor public class PurchasesAndAnalytics {
 
-    public lazy var analytics = AnalyticsService()
-    public lazy var purchases = PurchaseService()
-    public lazy var paywalls = PaywallService(purchaseService: purchases)
+    public lazy var analytics: AnalyticsServiceProtocol = _analytics
+    public lazy var purchases: PurchaseServiceProtocol = _purchases
+    public lazy var paywalls: PaywallServiceProtocol = _paywalls
+    public lazy var remoteConfig: RemoteConfigServiceProtocol = _remoteConfig
+    
+    lazy var _analytics = AnalyticsService()
+    lazy var _purchases = PurchaseService()
+    lazy var _paywalls = PaywallService(purchaseService: _purchases)
+    lazy var _remoteConfig = RemoteConfigService.shared
     
     /// Set this value before accessing the `analytics`
     public var dataFetchComplete: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
     
+    public static let shared = PurchasesAndAnalytics()
+    
     private init() {
-        purchases.logEvent = self.log
+        _purchases.logEvent = self.log
         
-        analytics.analyticsStarted = { options in
+        _analytics.analyticsStarted = { options in
             Task {
-                await self.analytics.firebaseSignIn(options)
-                await self.paywalls.fetchPaywallsAndProducts()
-                await self.purchases.verifySubscriptionIfNeeded()
+                await self._analytics.firebaseSignIn(options)
+                await self._paywalls.fetchPaywallsAndProducts()
+                await self._purchases.verifySubscriptionIfNeeded()
+                await self._remoteConfig.fetch()
                 await MainActor.run {
                     self.dataFetchComplete?(options)
                 }
             }
         }
     }
-    
-    public static let shared = PurchasesAndAnalytics()
     
     func log(_ e: EventProtocol) {
         analytics.log(e: e)

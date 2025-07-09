@@ -51,7 +51,7 @@ struct CustomPaywallData {
 
 public typealias PaywallIdentifier = String
 
-public class PaywallService: PaywallServiceProtocol {
+class PaywallService: PaywallServiceProtocol {
     
     public var placements = Set<String>()
     

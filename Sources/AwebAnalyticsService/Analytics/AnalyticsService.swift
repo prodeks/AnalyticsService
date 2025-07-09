@@ -33,7 +33,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     var attributionData: AnyPublisher<[AnyHashable : Any], Never> { get }
 }
 
-public class AnalyticsService: NSObject, AnalyticsServiceProtocol {
+class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
     private let firebase = Analytics.self
     private let asaTools = ASATools.instance
