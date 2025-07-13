@@ -68,7 +68,7 @@ class PaywallService: PaywallServiceProtocol {
     public func setFallbackPaywalls(url: URL) {
         Adapty.setFallbackPaywalls(fileURL: url)
     }
-        
+    
     public func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol? {
         Log.printLog(l: .debug, str: "Show paywall for placement: \(placement.identifier)")
         assert(uiFactory != nil)
@@ -86,17 +86,19 @@ class PaywallService: PaywallServiceProtocol {
                     return nil
                 }
             case .adaptyBuilder(let adaptyBuilderData):
-                let proxy = AdaptyPaywallControllerDelegateProxy()
-                if let adaptyController = try? AdaptyUI.paywallController(
-                    with: adaptyBuilderData.configuration,
-                    delegate: proxy
-                ) {
+                do {
+                    let proxy = AdaptyPaywallControllerDelegateProxy()
+                    let adaptyController = try AdaptyUI.paywallController(
+                        with: adaptyBuilderData.configuration,
+                        delegate: proxy
+                    )
                     return AdaptyPaywallControllerWrapper(
                         wrappedController: adaptyController,
                         purchaseService: purchaseService,
                         proxy: proxy
                     )
-                } else {
+                } catch {
+                    Log.printLog(l: .error, str: "Failed to create Adapty paywall controller: \(error)")
                     return nil
                 }
             }
@@ -108,33 +110,29 @@ class PaywallService: PaywallServiceProtocol {
     func fetchPaywallsAndProducts() async {
         let paywalls = await placements
             .asyncMap { identifier -> PaywallData? in
-                if let paywall = try? await Adapty.getPaywall(placementId: identifier) {
+                do {
+                    let paywall = try await Adapty.getPaywall(placementId: identifier)
                     if paywall.hasViewConfiguration {
-                        if let config = try? await AdaptyUI.getPaywallConfiguration(forPaywall: paywall) {
-                            return .adaptyBuilder(
-                                AdaptyBuilderData(
-                                    placement: identifier,
-                                    adaptyPaywall: paywall,
-                                    configuration: config
-                                )
+                        let config = try await AdaptyUI.getPaywallConfiguration(forPaywall: paywall)
+                        return .adaptyBuilder(
+                            AdaptyBuilderData(
+                                placement: identifier,
+                                adaptyPaywall: paywall,
+                                configuration: config
                             )
-                        } else {
-                            return nil
-                        }
+                        )
                     } else {
-                        if let products = try? await Adapty.getPaywallProducts(paywall: paywall) {
-                            return .customPaywall(
-                                CustomPaywallData(
-                                    placement: identifier,
-                                    adaptyPaywall: paywall,
-                                    products: products
-                                )
+                        let products = try await Adapty.getPaywallProducts(paywall: paywall)
+                        return .customPaywall(
+                            CustomPaywallData(
+                                placement: identifier,
+                                adaptyPaywall: paywall,
+                                products: products
                             )
-                        } else {
-                            return nil
-                        }
+                        )
                     }
-                } else {
+                } catch {
+                    Log.printLog(l: .error, str: "Failed to fetch paywall for placement: \(identifier)")
                     return nil
                 }
             }

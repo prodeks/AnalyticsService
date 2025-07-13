@@ -73,9 +73,12 @@ class PurchaseService: PurchaseServiceProtocol {
     }
     
     func verifySubscriptionIfNeeded() async {
-        if let profile = try? await Adapty.getProfile() {
+        do {
+            let profile = try await Adapty.getProfile()
             let hasSub = profile.accessLevels["premium"]?.isActive ?? false
             self.isSubActive = hasSub
+        } catch {
+            Log.printLog(l: .error, str: "Failed to verify subscription: \(error.localizedDescription)")
         }
     }
 }
