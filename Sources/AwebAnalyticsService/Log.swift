@@ -1,6 +1,10 @@
 import Foundation
+import os
 
 enum Log {
+    
+    private static var logger = Logger(subsystem: "AnalyticsPackage", category: "")
+    
     enum Level {
         case debug
         case analytics
@@ -16,6 +20,13 @@ enum Log {
     }
     
     static func printLog(l: Level, str: String) {
-        print(l.prefix.appending(str))
+        switch l {
+        case .debug:
+            logger.log(level: .debug, "\(l.prefix)\(str)")
+        case .analytics:
+            logger.log(level: .info, "\(l.prefix)\(str)")
+        case .error:
+            logger.log(level: .error, "\(l.prefix)\(str)")
+        }
     }
 }
