@@ -9,7 +9,7 @@ import UIKit
     
     lazy var _analytics = AnalyticsService()
     lazy var _purchases = PurchaseService()
-    lazy var _paywalls = PaywallService(purchaseService: _purchases)
+    lazy var _paywalls = PaywallService(purchaseService: _purchases, analyticsService: _analytics)
     lazy var _remoteConfig = RemoteConfigService.shared
     
     /// Set this value before accessing the `analytics`

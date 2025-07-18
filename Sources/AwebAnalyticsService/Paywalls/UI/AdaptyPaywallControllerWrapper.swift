@@ -8,13 +8,16 @@ class AdaptyPaywallControllerWrapper: UIViewController, PaywallControllerProtoco
     
     let wrappedController: AdaptyPaywallController
     let purchaseService: PurchaseService
+    let analyticsService: AnalyticsService
     let proxy: AdaptyPaywallControllerDelegateProxy
     
     init(
         wrappedController: AdaptyPaywallController,
         purchaseService: PurchaseService,
+        analyticsService: AnalyticsService,
         proxy: AdaptyPaywallControllerDelegateProxy
     ) {
+        self.analyticsService = analyticsService
         self.wrappedController = wrappedController
         self.purchaseService = purchaseService
         self.proxy = proxy
@@ -106,6 +109,23 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
 }
 
 extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
+    enum Events {
+        enum Tap: EventProtocol {
+            case startPurchase
+            
+            var name: String {
+                switch self {
+                case .startPurchase:
+                    return "Paywall_Start_Button_tap"
+                }
+            }
+            
+            var params: [String : Any] {
+                return [:]
+            }
+        }
+    }
+    
     public func paywallController(_ controller: AdaptyPaywallController, didPerform action: AdaptyUI.Action) {
         switch action {
         case .close:
@@ -120,12 +140,17 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     
     func paywallController(
         _ controller: AdaptyPaywallController,
-        didSelectProduct product: AdaptyPaywallProduct) {
+        didSelectProduct product: any AdaptyPaywallProductWithoutDeterminingOffer
+    ) {
         
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didStartPurchase product: AdaptyPaywallProduct) {
-        
+    public func paywallController(
+        _ controller: AdaptyPaywallController,
+        didStartPurchase product: AdaptyPaywallProduct
+    ) {
+        Log.printLog(l: .debug, str: #function)
+        analyticsService.log(e: AdaptyPaywallControllerWrapper.Events.Tap.startPurchase)
     }
   
     func paywallController(

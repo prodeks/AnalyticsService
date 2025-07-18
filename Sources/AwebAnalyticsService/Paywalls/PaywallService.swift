@@ -60,9 +60,11 @@ class PaywallService: PaywallServiceProtocol {
     var paywallData = [PaywallData]()
     
     let purchaseService: PurchaseService
+    let analyticsService: AnalyticsService
     
-    init(purchaseService: PurchaseService) {
+    init(purchaseService: PurchaseService, analyticsService: AnalyticsService) {
         self.purchaseService = purchaseService
+        self.analyticsService = analyticsService
     }
     
     public func setFallbackPaywalls(url: URL) {
@@ -95,6 +97,7 @@ class PaywallService: PaywallServiceProtocol {
                     return AdaptyPaywallControllerWrapper(
                         wrappedController: adaptyController,
                         purchaseService: purchaseService,
+                        analyticsService: analyticsService,
                         proxy: proxy
                     )
                 } catch {
