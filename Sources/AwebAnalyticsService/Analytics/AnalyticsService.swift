@@ -18,6 +18,7 @@ import Mixpanel
 import FirebaseFirestore
 
 public protocol AnalyticsServiceProtocol: AnyObject {
+    func setupAnalyticsIfNeeded(options: [UIApplication.LaunchOptionsKey: Any]?)
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
     func applicationDidBecomeActive(_ application: UIApplication)
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool
@@ -52,12 +53,10 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     }
     
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
+    private var didSetupAnalytics = false
     
-    public func didFinishLaunchingWithOptions(
-        application: UIApplication,
-        options: [UIApplication.LaunchOptionsKey: Any]?
-    ) {
-        Task { @MainActor in
+    public func setupAnalyticsIfNeeded(options: [UIApplication.LaunchOptionsKey: Any]?) {
+        if !didSetupAnalytics {
             appsflyer.appsFlyerDevKey = PurchasesAndAnalytics.Keys.appsflyerKey ?? ""
             appsflyer.appleAppID = PurchasesAndAnalytics.Keys.appID ?? ""
             appsflyer.delegate = self
@@ -67,7 +66,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             purchaseConnector.purchaseRevenueDelegate = self
             purchaseConnector.purchaseRevenueDataSource = self
             purchaseConnector.autoLogPurchaseRevenue = .autoRenewableSubscriptions
-
+            
             FirebaseApp.configure()
             
             Mixpanel.initialize(token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "", trackAutomaticEvents: false)
@@ -86,16 +85,23 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     }
                 }
             }
-            
-            ApplicationDelegate.shared.application(
-                application,
-                didFinishLaunchingWithOptions: options
-            )
-            
             Messaging.messaging().delegate = self
-            
-            analyticsStarted?(options)
+            didSetupAnalytics = true
         }
+
+        analyticsStarted?(options)
+    }
+    
+    public func didFinishLaunchingWithOptions(
+        application: UIApplication,
+        options: [UIApplication.LaunchOptionsKey: Any]?
+    ) {
+        ApplicationDelegate.shared.application(
+            application,
+            didFinishLaunchingWithOptions: options
+        )
+        
+        setupAnalyticsIfNeeded(options: options)
     }
     
     func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
