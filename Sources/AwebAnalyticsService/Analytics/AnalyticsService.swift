@@ -126,6 +126,11 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     key: "mixpanel_user_id",
                     value: Mixpanel.mainInstance().distinctId
                 )
+                
+                try await Adapty.setIntegrationIdentifier(
+                    key: "facebook_anonymous_id",
+                    value: AppEvents.shared.anonymousID
+                )
             }
         } catch {
             Log.printLog(l: .error, str: error.localizedDescription)
