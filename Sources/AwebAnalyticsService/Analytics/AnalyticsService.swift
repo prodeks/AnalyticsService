@@ -5,7 +5,6 @@ import AppTrackingTransparency
 import FacebookCore
 import AdServices
 import FirebaseAuth
-import ASATools
 import AdSupport
 import UserNotifications
 import Adapty
@@ -16,6 +15,7 @@ import AppsFlyerLib
 import PurchaseConnector
 import Mixpanel
 import FirebaseFirestore
+import AdjustSdk
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func setupAnalyticsIfNeeded(options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -37,7 +37,6 @@ public protocol AnalyticsServiceProtocol: AnyObject {
 class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
     private let firebase = Analytics.self
-    private let asaTools = ASATools.instance
     private let adapty = Adapty.self
     private let adaptyUI = AdaptyUI.self
     private let appsflyer = AppsFlyerLib.shared()
@@ -72,19 +71,6 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             Mixpanel.initialize(token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "", trackAutomaticEvents: false)
             Mixpanel.mainInstance().loggingEnabled = true
             
-            if let key = PurchasesAndAnalytics.Keys.asatoolsKey {
-                asaTools.attribute(apiToken: key) { response, error in
-                    if let response {
-                        let firebaseProperties = response.analyticsValues()
-                        firebaseProperties.forEach { key, value in
-                            self.firebase.setUserProperty(String(describing: value), forName: key)
-                        }
-                        self.log(e: ASAAttributionEvent(params: firebaseProperties))
-                    } else if let error = error {
-                        self.log(e: ASAAttributionErrorEvent(description: error.localizedDescription))
-                    }
-                }
-            }
             Messaging.messaging().delegate = self
             didSetupAnalytics = true
         }
@@ -131,6 +117,34 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     key: "facebook_anonymous_id",
                     value: AppEvents.shared.anonymousID
                 )
+                
+#if DEBUG
+                let environment = ADJEnvironmentSandbox
+                let adjustConfig = ADJConfig(
+                    appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
+                    environment: environment)
+                adjustConfig?.logLevel = ADJLogLevel.verbose
+                
+#else
+                let environment = ADJEnvironmentProduction
+                let adjustConfig = ADJConfig(
+                    appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
+                    environment: environment)
+                adjustConfig?.logLevel = ADJLogLevel.suppress
+#endif
+                
+                Adjust.initSdk(adjustConfig)
+                Adjust.adid { token in
+                    if let token {
+                        Adapty.setIntegrationIdentifier(key: "adjust_device_id", value: token)
+                    }
+                }
+                
+                Adjust.attribution { attribution in
+                    if let dict = attribution?.dictionary(){
+                        Adapty.updateAttribution(dict, source: "adjust")
+                    }
+                }
             }
         } catch {
             Log.printLog(l: .error, str: error.localizedDescription)

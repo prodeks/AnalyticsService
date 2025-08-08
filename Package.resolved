@@ -19,6 +19,15 @@
       }
     },
     {
+      "identity" : "adjust_signature_sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/adjust/adjust_signature_sdk.git",
+      "state" : {
+        "revision" : "a84f08b41f7e38624815816f6e93cadc9ea22a92",
+        "version" : "3.47.0"
+      }
+    },
+    {
       "identity" : "app-check",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/google/app-check.git",
@@ -120,10 +129,10 @@
     {
       "identity" : "ios_sdk",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ASATools/ios_sdk.git",
+      "location" : "https://github.com/adjust/ios_sdk",
       "state" : {
-        "revision" : "bb5938cbe3f64f5690580e677699a4b19f69b0fe",
-        "version" : "1.5.0"
+        "revision" : "0f34f3580df53390745758d185bded09fa2003da",
+        "version" : "5.4.2"
       }
     },
     {

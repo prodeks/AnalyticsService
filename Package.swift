@@ -11,11 +11,11 @@ let package = Package(
         .package(url: "https://github.com/AppsFlyerSDK/AppsFlyerFramework-Dynamic", exact: .init(6, 15, 2)),
         .package(url: "https://github.com/facebook/facebook-ios-sdk", exact: Version(18, 0, 0)),
         .package(url: "https://github.com/firebase/firebase-ios-sdk", exact: Version(11, 14, 0)),
-        .package(url: "https://github.com/ASATools/ios_sdk.git", exact: Version(1, 5, 0)),
         .package(url: "https://github.com/airbnb/lottie-ios.git", exact: Version(4, 5, 1)),
         .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(3, 7, 0)),
         .package(url: "https://github.com/AppsFlyerSDK/PurchaseConnector-Dynamic", exact: .init(6, 15, 3)),
-        .package(url: "https://github.com/mixpanel/mixpanel-swift.git", exact: .init(5, 0, 0))
+        .package(url: "https://github.com/mixpanel/mixpanel-swift.git", exact: .init(5, 0, 0)),
+        .package(url: "https://github.com/adjust/ios_sdk", exact: .init(5, 4, 2))
     ],
     targets: [
         .target(
@@ -29,12 +29,12 @@ let package = Package(
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseMessaging", package: "firebase-ios-sdk"),
                 .product(name: "AppsFlyerLib-Dynamic", package: "AppsFlyerFramework-Dynamic"),
-                .product(name: "ASATools", package: "ios_sdk"),
                 .product(name: "Lottie", package: "lottie-ios"),
                 .product(name: "Adapty", package: "AdaptySDK-iOS"),
                 .product(name: "AdaptyUI", package: "AdaptySDK-iOS"),
                 .product(name: "PurchaseConnector-Dynamic", package: "PurchaseConnector-Dynamic"),
-                .product(name: "Mixpanel", package: "mixpanel-swift")
+                .product(name: "Mixpanel", package: "mixpanel-swift"),
+                .product(name: "AdjustSdk", package: "ios_sdk")
             ]
         )
     ]
