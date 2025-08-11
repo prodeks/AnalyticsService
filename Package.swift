@@ -27,6 +27,7 @@ let package = Package(
                 .product(name: "FirebaseAnalytics", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseCrashlytics", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
+                .product(name: "FirebaseStorage", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseMessaging", package: "firebase-ios-sdk"),
                 .product(name: "AppsFlyerLib-Dynamic", package: "AppsFlyerFramework-Dynamic"),
                 .product(name: "Lottie", package: "lottie-ios"),
