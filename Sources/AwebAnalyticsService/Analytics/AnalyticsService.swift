@@ -31,6 +31,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus
     
     var userID: AnyPublisher<String, Never> { get }
+    var _userID: String { get set }
     var attributionData: AnyPublisher<[AnyHashable : Any], Never> { get }
 }
 
@@ -42,7 +43,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private let appsflyer = AppsFlyerLib.shared()
     private let purchaseConnector = PurchaseConnector.shared()
     
-    @Published private var _userID = ""
+    @Published public var _userID = ""
     public var userID: AnyPublisher<String, Never> {
         $_userID.eraseToAnyPublisher()
     }
