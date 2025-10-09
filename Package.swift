@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "AwebAnalyticsService",
-    platforms: [.iOS(.v15)],
+    platforms: [.iOS(.v16)],
     products: [.library(name: "AwebAnalyticsService", targets: ["AwebAnalyticsService"])],
     dependencies: [
         .package(url: "https://github.com/AppsFlyerSDK/AppsFlyerFramework-Dynamic", exact: .init(6, 15, 2)),

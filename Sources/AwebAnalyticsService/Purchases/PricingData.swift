@@ -1,70 +1,46 @@
 import Foundation
 
-public struct PricingData {
+public class PricingData {
     public let value: Double
-    public let localizedPrice: String
     public let priceLocale: Locale
     public let currencySymbol: String
     public let iap: any IAPProtocol
     
-    public lazy var priceLocaleAndValue: (locale: Locale, value: Double)? = parsePrice(from: localizedPrice)
-    
-    public lazy var weeklyPrice: String? = priceLocaleAndValue
-        .map { arg in
-            return localizedWeeklyPrice((iap: iap, price: arg))
-        }
-    public lazy var dailyPrice: String? = priceLocaleAndValue
-        .map { arg in
-            return localizedDailyPrice((iap: iap, price: arg))
-        }
-    public lazy var yearlyPrice: String? = priceLocaleAndValue
-        .map { arg in
-            return localizedYearlyPrice((iap: iap, price: arg))
-        }
-}
-
-fileprivate let f = NumberFormatter()
-
-func parsePrice(from priceString: String) -> (locale: Locale, value: Double)? {
-    for identifier in Locale.availableIdentifiers {
-        let locale = Locale(identifier: identifier)
-        
-        f.locale = locale
-        f.numberStyle = .currency
-
-        if let number = f.number(from: priceString) {
-            if let currencySymbol = locale.currencySymbol, priceString.contains(currencySymbol) {
-                return (locale, number.doubleValue)
-            }
-        }
+    init(
+        value: Double,
+        priceLocale: Locale,
+        currencySymbol: String,
+        iap: any IAPProtocol
+    ) {
+        self.value = value
+        self.priceLocale = priceLocale
+        self.currencySymbol = currencySymbol
+        self.iap = iap
     }
-    return nil
-}
-
-func localizedWeeklyPrice(_ arg: (iap: any IAPProtocol, price: (locale: Locale, value: Double))) -> String {
-    f.locale = arg.price.locale
-    f.numberStyle = .currency
-    let weeklyPrice = arg.price.value / Double(arg.iap.weekCount)
-    return f.string(from: NSNumber(value: weeklyPrice)) ?? ""
-}
-
-func localizedDailyPrice(_ arg: (iap: any IAPProtocol, price: (locale: Locale, value: Double))) -> String {
-    f.locale = arg.price.locale
-    f.numberStyle = .currency
-    let dailyPrice = arg.price.value / Double(arg.iap.weekCount * 7)
-    return f.string(from: NSNumber(value: dailyPrice)) ?? ""
-}
-
-func localizedYearlyPrice(_ arg: (iap: any IAPProtocol, price: (locale: Locale, value: Double))) -> String {
-    f.locale = arg.price.locale
-    f.numberStyle = .currency
-    let yearlyPrice = (arg.price.value / Double(arg.iap.weekCount)) * 52
-    return f.string(from: NSNumber(value: yearlyPrice)) ?? ""
-}
-
-func localizedMonthlyPrice(_ arg: (iap: any IAPProtocol, price: (locale: Locale, value: Double))) -> String {
-    f.locale = arg.price.locale
-    f.numberStyle = .currency
-    let monthlyPrice = (arg.price.value / Double(arg.iap.weekCount)) * 4.33
-    return f.string(from: NSNumber(value: monthlyPrice)) ?? ""
+    
+    public lazy var localizedPrice: String = {
+        let currency = priceLocale.currency?.identifier ?? ""
+        let formatted = String(format: "%.2f", value)
+        return "\(formatted) \(currency)"
+    }()
+    
+    public lazy var weeklyPrice: String = {
+        let currency = priceLocale.currency?.identifier ?? ""
+        let weeklyPrice = value / Double(iap.weekCount)
+        let formatted = String(format: "%.2f", weeklyPrice)
+        return "\(formatted) \(currency)"
+    }()
+    
+    public lazy var dailyPrice: String = {
+        let currency = priceLocale.currency?.identifier ?? ""
+        let dailyPrice = value / Double(iap.weekCount * 7)
+        let formatted = String(format: "%.2f", dailyPrice)
+        return "\(formatted) \(currency)"
+    }()
+    public lazy var yearlyPrice: String = {
+        let currency = priceLocale.currency?.identifier ?? ""
+        let yearlyPrice = (value / Double(iap.weekCount)) * 52
+        let formatted = String(format: "%.2f", yearlyPrice)
+        return "\(formatted) \(currency)"
+    }()
 }

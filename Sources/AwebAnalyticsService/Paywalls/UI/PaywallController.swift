@@ -69,7 +69,6 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
             .flatMap { product in
                 PricingData(
                     value: Double(truncating: product.price as NSNumber),
-                    localizedPrice: product.localizedPrice ?? "",
                     priceLocale: product.priceLocale,
                     currencySymbol: product.currencySymbol ?? "",
                     iap: iap
