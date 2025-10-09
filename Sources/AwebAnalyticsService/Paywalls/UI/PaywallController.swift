@@ -71,7 +71,8 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
                     value: Double(truncating: product.price as NSNumber),
                     localizedPrice: product.localizedPrice ?? "",
                     priceLocale: product.priceLocale,
-                    currencySymbol: product.currencySymbol ?? ""
+                    currencySymbol: product.currencySymbol ?? "",
+                    iap: iap
                 )
             }
     }
