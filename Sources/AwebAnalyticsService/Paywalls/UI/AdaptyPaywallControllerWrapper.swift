@@ -93,7 +93,7 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
         forwarding?.paywallController(controller, didFailRestoreWith: error)
     }
     
-    public func paywallController(_ controller: AdaptyPaywallController, didFailRenderingWith error: AdaptyError) {
+    func paywallController(_ controller: AdaptyPaywallController, didFailRenderingWith error: AdaptyUIError) {
         Log.printLog(l: .debug, str: #function)
         forwarding?.paywallController(controller, didFailRenderingWith: error)
     }

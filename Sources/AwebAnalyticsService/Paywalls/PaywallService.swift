@@ -68,7 +68,7 @@ class PaywallService: PaywallServiceProtocol {
     }
     
     public func setFallbackPaywalls(url: URL) {
-        Adapty.setFallbackPaywalls(fileURL: url)
+        Adapty.setFallback(fileURL: url)
     }
     
     public func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol? {
