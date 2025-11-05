@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/adjust/adjust_signature_sdk.git",
       "state" : {
-        "revision" : "a84f08b41f7e38624815816f6e93cadc9ea22a92",
-        "version" : "3.47.0"
+        "revision" : "b11c73304c2410bd410cc9369b812a83cc117002",
+        "version" : "3.61.0"
       }
     },
     {
@@ -131,8 +131,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/adjust/ios_sdk",
       "state" : {
-        "revision" : "0f34f3580df53390745758d185bded09fa2003da",
-        "version" : "5.4.2"
+        "revision" : "fbe95360df63c3c0f9a98c5f2efb39b46bd2f08d",
+        "version" : "5.4.6"
       }
     },
     {

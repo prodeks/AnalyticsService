@@ -15,7 +15,7 @@ let package = Package(
         .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(3, 12, 0)),
         .package(url: "https://github.com/AppsFlyerSDK/PurchaseConnector-Dynamic", exact: .init(6, 15, 3)),
         .package(url: "https://github.com/mixpanel/mixpanel-swift.git", exact: .init(5, 0, 0)),
-        .package(url: "https://github.com/adjust/ios_sdk", exact: .init(5, 4, 2))
+        .package(url: "https://github.com/adjust/ios_sdk", exact: .init(5, 4, 6))
     ],
     targets: [
         .target(

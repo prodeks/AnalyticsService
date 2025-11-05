@@ -119,36 +119,100 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     value: AppEvents.shared.anonymousID
                 )
                 
-#if DEBUG
-                let environment = ADJEnvironmentSandbox
-                let adjustConfig = ADJConfig(
-                    appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
-                    environment: environment)
-                adjustConfig?.logLevel = ADJLogLevel.verbose
-                
-#else
-                let environment = ADJEnvironmentProduction
-                let adjustConfig = ADJConfig(
-                    appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
-                    environment: environment)
-                adjustConfig?.logLevel = ADJLogLevel.suppress
-#endif
-                
-                Adjust.initSdk(adjustConfig)
-                Adjust.adid { token in
-                    if let token {
-                        Adapty.setIntegrationIdentifier(key: "adjust_device_id", value: token)
-                    }
-                }
-                
-                Adjust.attribution { attribution in
-                    if let dict = attribution?.dictionary(){
-                        Adapty.updateAttribution(dict, source: "adjust")
-                    }
-                }
+                initAdjust()
             }
         } catch {
             Log.printLog(l: .error, str: error.localizedDescription)
+        }
+    }
+    
+    func initAdjust() {
+        
+#if DEBUG
+        let environment = ADJEnvironmentSandbox
+        let adjustConfig = ADJConfig(
+            appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
+            environment: environment)
+        adjustConfig?.logLevel = ADJLogLevel.verbose
+        
+#else
+        let environment = ADJEnvironmentProduction
+        let adjustConfig = ADJConfig(
+            appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
+            environment: environment)
+        adjustConfig?.logLevel = ADJLogLevel.suppress
+#endif
+        
+        Adjust.initSdk(adjustConfig)
+        
+        Task {
+            let (adid, attribution) = await (Adjust.adid(), Adjust.attribution()?.dictionary())
+            do {
+                if let adid {
+                    try await Adapty.setIntegrationIdentifier(key: "adjust_device_id", value: adid)
+                }
+                if let attribution {
+                    try await Adapty.updateAttribution(attribution, source: "adjust")
+                    
+                }
+                
+                // Log adjust info
+                let firebaseAppInstanceId = Analytics.appInstanceID() ?? ""
+                await sendAttributionWebhook(
+                    storeId: PurchasesAndAnalytics.Keys.appID ?? "",
+                    firebaseAppInstanceId: firebaseAppInstanceId,
+                    adjustDeviceId: adid ?? "",
+                    source: "adjust",
+                    attribution: attribution ?? [:]
+                )
+            } catch {
+                Log.printLog(l: .error, str: error.localizedDescription)
+            }
+        }
+    }
+    
+    private func sendAttributionWebhook(
+        storeId: String,
+        firebaseAppInstanceId: String,
+        adjustDeviceId: String,
+        source: String,
+        attribution: [AnyHashable: Any]
+    ) async {
+        let webhookURL = "https://adapty-attributions-420095526567.europe-west1.run.app/webhook"
+        let authToken = "1dac2f40da774e43344f88eaee0ad566742d73f803f0a88d42626b803d55b085"
+        
+        guard let url = URL(string: webhookURL) else {
+            Log.printLog(l: .error, str: "Invalid webhook URL")
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(authToken, forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let payload: [String: Any] = [
+            "store_id": storeId,
+            "firebase_app_instance_id": firebaseAppInstanceId,
+            "adjust_device_id": adjustDeviceId,
+            "source": source,
+            "attribution": attribution
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+            
+            let (_, response) = try await URLSession.shared.data(for: request)
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 200 {
+                    Log.printLog(l: .debug, str: "Attribution webhook sent successfully")
+                } else {
+                    Log.printLog(l: .error, str: "Attribution webhook failed with status code: \(httpResponse.statusCode)")
+                }
+            }
+        } catch {
+            Log.printLog(l: .error, str: "Failed to send attribution webhook: \(error.localizedDescription)")
         }
     }
     
