@@ -8,5 +8,8 @@ extension PurchasesAndAnalytics {
         public static var appsflyerKey: String?
         public static var appID: String?
         public static var mixPanelToken: String?
+        
+        // Attribution data keys
+        public static let adjustDeeplinkKey = "adjust_deeplink"
     }
 }

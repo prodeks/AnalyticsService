@@ -134,13 +134,14 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
             environment: environment)
         adjustConfig?.logLevel = ADJLogLevel.verbose
-        
+        adjustConfig?.delegate = self
 #else
         let environment = ADJEnvironmentProduction
         let adjustConfig = ADJConfig(
             appToken: PurchasesAndAnalytics.Keys.adjustKey ?? "",
             environment: environment)
         adjustConfig?.logLevel = ADJLogLevel.suppress
+        adjustConfig?.delegate = self
 #endif
         
         Adjust.initSdk(adjustConfig)
@@ -229,6 +230,15 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any]
     ) -> Bool {
+        // Forward deep link to Adjust for attribution
+        if let adjustDeeplink = ADJDeeplink(deeplink: url) {
+            Adjust.processDeeplink(adjustDeeplink)
+        }
+        Log.printLog(l: .debug, str: "Adjust URL scheme deep link processed: \(url.absoluteString)")
+        
+        // Store direct deep link for app to handle
+        _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: url.absoluteString]
+        
         return ApplicationDelegate.shared.application(
             app,
             open: url,
@@ -278,6 +288,16 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         continue userActivity: NSUserActivity
     ) -> Bool {
+        if userActivity.activityType == NSUserActivityTypeBrowsingWeb,
+           let url = userActivity.webpageURL,
+            let adjustDeeplink = ADJDeeplink(deeplink: url) {
+            
+            Adjust.processDeeplink(adjustDeeplink)
+            Log.printLog(l: .debug, str: "Adjust Universal Link processed: \(url.absoluteString)")
+            
+            // Store direct deep link for app to handle
+            _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: url.absoluteString]
+        }
         return true
     }
     
@@ -385,5 +405,23 @@ extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseReve
         transactions: Set<SKPaymentTransaction>?
     ) -> [AnyHashable : Any]? {
         return nil
+    }
+}
+
+// MARK: - AdjustDelegate
+extension AnalyticsService: AdjustDelegate {
+    func adjustAttributionChanged(_ attribution: ADJAttribution?) {
+        print(attribution)
+    }
+    
+    func adjustSkanUpdated(withConversionData data: [String : String]) {
+        _attributionData = ["adjust_deferred_deeplink": data]
+    }
+    
+    func adjustDeferredDeeplinkReceived(_ deeplink: URL?) -> Bool {
+        if let deeplink {
+            _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: deeplink.absoluteString]
+        }
+        return false
     }
 }
