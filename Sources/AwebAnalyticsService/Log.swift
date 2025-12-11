@@ -20,13 +20,6 @@ enum Log {
     }
     
     static func printLog(l: Level, str: String) {
-        switch l {
-        case .debug:
-            logger.log(level: .debug, "\(l.prefix)\(str)")
-        case .analytics:
-            logger.log(level: .info, "\(l.prefix)\(str)")
-        case .error:
-            logger.log(level: .error, "\(l.prefix)\(str)")
-        }
+        print("\(l.prefix)\(str)")
     }
 }
