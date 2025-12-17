@@ -154,7 +154,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 }
                 if let attribution {
                     try await Adapty.updateAttribution(attribution, source: "adjust")
-                    
+                    _attributionData = attribution
                 }
                 
                 // Log adjust info

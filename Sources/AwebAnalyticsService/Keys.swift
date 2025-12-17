@@ -11,5 +11,6 @@ extension PurchasesAndAnalytics {
         
         // Attribution data keys
         public static let adjustDeeplinkKey = "adjust_deeplink"
+        public static let adjustAttributionKey = "adjust_attribution"
     }
 }
