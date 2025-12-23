@@ -289,14 +289,15 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         continue userActivity: NSUserActivity
     ) -> Bool {
         if userActivity.activityType == NSUserActivityTypeBrowsingWeb,
-           let url = userActivity.webpageURL,
-            let adjustDeeplink = ADJDeeplink(deeplink: url) {
+           let url = userActivity.webpageURL {
             
-            Adjust.processDeeplink(adjustDeeplink)
-            Log.printLog(l: .debug, str: "Adjust Universal Link processed: \(url.absoluteString)")
-            
-            // Store direct deep link for app to handle
-            _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: url.absoluteString]
+            if let adjustDeeplink = ADJDeeplink(deeplink: url) {
+                Adjust.processDeeplink(adjustDeeplink)
+                Log.printLog(l: .debug, str: "Adjust Universal Link processed: \(url.absoluteString)")
+                
+                // Store direct deep link for app to handle
+                _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: url.absoluteString]
+            }
         }
         return true
     }
@@ -410,18 +411,72 @@ extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseReve
 
 // MARK: - AdjustDelegate
 extension AnalyticsService: AdjustDelegate {
-    func adjustAttributionChanged(_ attribution: ADJAttribution?) {
-        print(attribution)
+    public func adjustAttributionChanged(_ attribution: ADJAttribution?) {
+        Log.printLog(l: .debug, str: "Adjust attribution changed: \(String(describing: attribution))")
+        
+        guard let attribution else { return }
+        
+        // Build attribution dictionary with all available data
+        var attributionDict: [AnyHashable: Any] = [:]
+        
+        if let trackerToken = attribution.trackerToken {
+            attributionDict["tracker_token"] = trackerToken
+        }
+        if let trackerName = attribution.trackerName {
+            attributionDict["tracker_name"] = trackerName
+        }
+        if let network = attribution.network {
+            attributionDict["network"] = network
+        }
+        if let campaign = attribution.campaign {
+            attributionDict["campaign"] = campaign
+        }
+        if let adgroup = attribution.adgroup {
+            attributionDict["adgroup"] = adgroup
+        }
+        if let creative = attribution.creative {
+            attributionDict["creative"] = creative
+        }
+        if let clickLabel = attribution.clickLabel {
+            attributionDict["click_label"] = clickLabel
+        }
+        if let costType = attribution.costType {
+            attributionDict["cost_type"] = costType
+        }
+        if let costAmount = attribution.costAmount {
+            attributionDict["cost_amount"] = costAmount
+        }
+        if let costCurrency = attribution.costCurrency {
+            attributionDict["cost_currency"] = costCurrency
+        }
+        
+        // Update attribution data - this will trigger subscribers in AppCoordinator
+        _attributionData = attributionDict
+        
+        // Also update Adapty with the attribution
+        Task {
+            do {
+                try await Adapty.updateAttribution(attributionDict, source: "adjust")
+            } catch {
+                Log.printLog(l: .error, str: "Failed to update Adapty attribution: \(error.localizedDescription)")
+            }
+        }
     }
     
-    func adjustSkanUpdated(withConversionData data: [String : String]) {
-        _attributionData = ["adjust_deferred_deeplink": data]
+    public func adjustSkanUpdated(withConversionData data: [String : String]) {
+        Log.printLog(l: .debug, str: "Adjust SKAN updated: \(data)")
+        // SKAN data is for iOS conversion tracking, merge with existing attribution if needed
     }
     
-    func adjustDeferredDeeplinkReceived(_ deeplink: URL?) -> Bool {
+    public func adjustDeferredDeeplinkReceived(_ deeplink: URL?) -> Bool {
+        Log.printLog(l: .debug, str: "Adjust deferred deeplink received: \(String(describing: deeplink))")
+        
         if let deeplink {
+            // Store the deferred deeplink URL
             _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: deeplink.absoluteString]
         }
+        // Return false to prevent Adjust from opening the URL automatically
+        // The app will handle navigation based on attribution data
         return false
     }
 }
