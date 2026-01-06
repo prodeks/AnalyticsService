@@ -29,6 +29,7 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     func registerForNotifications()
     func log(e: EventProtocol)
     func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus
+    func updateRefundDataConsent(granted: Bool) async
     
     var userID: AnyPublisher<String, Never> { get }
     var _userID: String { get set }
@@ -101,6 +102,9 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                 try await adapty.activate(key, customerUserId: userID)
                 try await adaptyUI.activate()
+                
+                // Set default refund data consent
+                try await adapty.updateCollectingRefundDataConsent(true)
                 
                 if let appInstanceId = Analytics.appInstanceID() {
                     try await Adapty.setIntegrationIdentifier(
@@ -336,6 +340,15 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         
         let params = e.params.mapValues { String.init(describing: $0) }
         Mixpanel.mainInstance().track(event: e.name, properties: params)
+    }
+
+    public func updateRefundDataConsent(granted: Bool) async {
+        do {
+            try await adapty.updateCollectingRefundDataConsent(granted)
+            Log.printLog(l: .debug, str: "Updated Adapty refund data consent to \(granted)")
+        } catch {
+            Log.printLog(l: .error, str: "Failed to update Adapty refund data consent: \(error.localizedDescription)")
+        }
     }
 }
 
