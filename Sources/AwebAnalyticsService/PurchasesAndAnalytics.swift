@@ -22,18 +22,16 @@ import UIKit
         
         _analytics.analyticsStarted = { options in
             Task {
-                await Task {
-                    await self._analytics.firebaseSignIn(options)
-                    
-                    async let paywallsTask = self._paywalls.fetchPaywallsAndProducts()
-                    async let subscriptionTask = self._purchases.verifySubscriptionIfNeeded()
-                    async let remoteConfigTask = self._remoteConfig.fetch()
-                    
-                    _ = await (paywallsTask, subscriptionTask, remoteConfigTask)
-                    
-                    await MainActor.run {
-                        self.dataFetchComplete?(options)
-                    }
+                await self._analytics.firebaseSignIn(options)
+                
+                async let paywallsTask: Void  = self._paywalls.fetchPaywallsAndProducts()
+                async let subscriptionTask: Void  = self._purchases.verifySubscriptionIfNeeded()
+                async let remoteConfigTask: Void  = self._remoteConfig.fetch()
+                
+                _ = await (paywallsTask, subscriptionTask, remoteConfigTask)
+                
+                await MainActor.run {
+                    self.dataFetchComplete?(options)
                 }
             }
         }

@@ -158,7 +158,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         didFinishPurchase product: any AdaptyPaywallProduct,
         purchaseResult: AdaptyPurchaseResult
     ) {
-        purchaseService.isSubActive = purchaseResult.isPurchaseSuccess
+        purchaseService.subscriptionStatus = purchaseResult.isPurchaseSuccess ? .active : .inactive
         dismissed?(product.vendorProductId)
     }
     
@@ -184,12 +184,13 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     }
     
     public func paywallController(_ controller: AdaptyPaywallController, didFinishRestoreWith profile: AdaptyProfile) {
-        let hasSub = profile.accessLevels["premium"]?.isActive ?? false
-        if hasSub {
-            purchaseService.isSubActive = hasSub
-            dismissed?(nil)
-        } else {
-            presentNoPurchasesToRestoreAlert()
+        if let subscriptionStatus = profile.accessLevels["premium"]?.subscriptionStatus {
+            purchaseService.subscriptionStatus = subscriptionStatus
+            if subscriptionStatus.isSubActive {
+                dismissed?(nil)
+            } else {
+                presentNoPurchasesToRestoreAlert()
+            }
         }
     }
     
