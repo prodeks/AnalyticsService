@@ -255,7 +255,8 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
-        
+        Messaging.messaging().apnsToken = deviceToken
+        application.registerForRemoteNotifications()
     }
     
     public func applicationDidBecomeActive(_ application: UIApplication) {
@@ -310,9 +311,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         _application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable : Any]
     ) {
-        Task { @MainActor in
-            
-        }
+        Messaging.messaging().appDidReceiveMessage(userInfo)
     }
     
     public func log(e: EventProtocol) {
