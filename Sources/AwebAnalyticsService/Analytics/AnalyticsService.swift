@@ -34,6 +34,8 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     var userID: AnyPublisher<String, Never> { get }
     var _userID: String { get set }
     var attributionData: AnyPublisher<[AnyHashable : Any], Never> { get }
+    
+    var fcmToken: String? { get }
 }
 
 class AnalyticsService: NSObject, AnalyticsServiceProtocol {
@@ -43,6 +45,8 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private let adaptyUI = AdaptyUI.self
     private let appsflyer = AppsFlyerLib.shared()
     private let purchaseConnector = PurchaseConnector.shared()
+    
+    var fcmToken: String? = ""
     
     @Published public var _userID = ""
     public var userID: AnyPublisher<String, Never> {
@@ -378,6 +382,7 @@ extension AnalyticsService: MessagingDelegate {
     public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         if let fcmToken {
             Log.printLog(l: .debug, str: "Did receive FCM token - \(fcmToken)")
+            self.fcmToken = fcmToken
         }
     }
 }
