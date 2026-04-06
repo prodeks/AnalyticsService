@@ -74,7 +74,11 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             
             FirebaseApp.configure()
             
-            Mixpanel.initialize(token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "", trackAutomaticEvents: false)
+            Mixpanel.initialize(
+                token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "",
+                trackAutomaticEvents: false,
+                serverURL: "https://api-eu.mixpanel.com"
+            )
             Mixpanel.mainInstance().loggingEnabled = true
             
             Messaging.messaging().delegate = self
