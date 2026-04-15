@@ -16,6 +16,7 @@ import PurchaseConnector
 import Mixpanel
 import FirebaseFirestore
 import AdjustSdk
+import StoreKit
 
 public protocol AnalyticsServiceProtocol: AnyObject {
     func setupAnalyticsIfNeeded(options: [UIApplication.LaunchOptionsKey: Any]?)
@@ -100,6 +101,17 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         setupAnalyticsIfNeeded(options: options)
     }
     
+    /// Chooses Adapty’s China cluster per [China cluster docs](https://adapty.io/docs/china-cluster?current-os=swift): storefront `CHN` first, then device region `CN` (e.g. Simulator may lack a storefront).
+    private func adaptyServerClusterForCurrentUser() async -> AdaptyServerCluster {
+        if await Storefront.current?.countryCode == "CHN" {
+            return .cn
+        }
+        if Locale.current.region?.identifier == "CN" {
+            return .cn
+        }
+        return .default
+    }
+    
     func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
         do {
             let signInResult = try await Auth.auth().signInAnonymously()
@@ -108,7 +120,12 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             _userID = userID
             appsflyer.customerUserID = userID
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
-                try await adapty.activate(key, customerUserId: userID)
+                let configuration = AdaptyConfiguration
+                    .builder(withAPIKey: key)
+                    .with(customerUserId: userID)
+                    .with(serverCluster: await adaptyServerClusterForCurrentUser())
+                    .build()
+                try await adapty.activate(with: configuration)
                 try await adaptyUI.activate()
                 
                 // Set default refund data consent
