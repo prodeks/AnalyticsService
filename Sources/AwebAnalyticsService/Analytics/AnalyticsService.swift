@@ -281,7 +281,6 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
         Messaging.messaging().apnsToken = deviceToken
-        application.registerForRemoteNotifications()
     }
     
     public func applicationDidBecomeActive(_ application: UIApplication) {
