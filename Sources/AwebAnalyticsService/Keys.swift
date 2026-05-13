@@ -8,6 +8,8 @@ extension PurchasesAndAnalytics {
         public static var appsflyerKey: String?
         public static var appID: String?
         public static var mixPanelToken: String?
+        public static var facebookAppId: String?
+        public static var facebookClientToken: String?
         
         // Attribution data keys
         public static let adjustDeeplinkKey = "adjust_deeplink"

@@ -63,6 +63,11 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     
     public func setupAnalyticsIfNeeded(options: [UIApplication.LaunchOptionsKey: Any]?) {
         if !didSetupAnalytics {
+            Settings.shared.appID = PurchasesAndAnalytics.Keys.facebookAppId
+            Settings.shared.clientToken = PurchasesAndAnalytics.Keys.facebookClientToken
+            Settings.shared.isAutoLogAppEventsEnabled = true
+            Settings.shared.isAdvertiserIDCollectionEnabled = true
+
             appsflyer.appsFlyerDevKey = PurchasesAndAnalytics.Keys.appsflyerKey ?? ""
             appsflyer.appleAppID = PurchasesAndAnalytics.Keys.appID ?? ""
             appsflyer.delegate = self
