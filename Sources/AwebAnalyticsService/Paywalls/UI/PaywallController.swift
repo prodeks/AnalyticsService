@@ -105,12 +105,22 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
                     self.presentCannotPurchaseAlert()
                 case .success:
                     self.logClose?()
-                    self.dismissed?(iap.productID)
+                    self.dismiss(iap.productID)
                 }
             }
         } else {
             self.presentCannotPurchaseAlert()
             self.overlayView.isHidden = true
+        }
+    }
+    
+    private func dismiss(_ purchasedProductID: String?) {
+        if let presented = presentedViewController {
+            presented.dismiss(animated: true) {
+                self.dismissed?(purchasedProductID)
+            }
+        } else {
+            self.dismissed?(purchasedProductID)
         }
     }
     
@@ -128,7 +138,7 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     public func dismiss() {
         logClose?()
-        dismissed?(nil)
+        dismiss(nil)
     }
     
     func presentNoPurchasesToRestoreAlert() {
