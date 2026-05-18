@@ -1,4 +1,5 @@
 import UIKit
+import StoreKit
 
 @MainActor public class PurchasesAndAnalytics {
 
@@ -22,6 +23,9 @@ import UIKit
         
         _analytics.analyticsStarted = { options in
             Task {
+                let isRunningInChina = await self.isRunningInChina()
+                self._paywalls.isRunningInChina = isRunningInChina
+                self._analytics.isRunningInChina = isRunningInChina
                 await self._analytics.firebaseSignIn(options)
                 
                 async let paywallsTask: Void  = self._paywalls.fetchPaywallsAndProducts()
@@ -35,6 +39,13 @@ import UIKit
                 }
             }
         }
+    }
+
+    private func isRunningInChina() async -> Bool {
+        let storefront = await Storefront.current?.countryCode
+        let locale = Locale.current.region?.identifier
+        
+        return storefront == "CHN" || locale == "CN"
     }
     
     func log(_ e: EventProtocol) {

@@ -48,6 +48,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private let purchaseConnector = PurchaseConnector.shared()
     
     var fcmToken: String? = ""
+    var isRunningInChina: Bool = false
     
     @Published public var _userID = ""
     public var userID: AnyPublisher<String, Never> {
@@ -108,13 +109,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     
     /// Chooses Adapty’s China cluster per [China cluster docs](https://adapty.io/docs/china-cluster?current-os=swift): storefront `CHN` first, then device region `CN` (e.g. Simulator may lack a storefront).
     private func adaptyServerClusterForCurrentUser() async -> AdaptyServerCluster {
-        if await Storefront.current?.countryCode == "CHN" {
-            return .cn
-        }
-        if Locale.current.region?.identifier == "CN" {
-            return .cn
-        }
-        return .default
+        return await isRunningInChina ? .cn : .default
     }
     
     func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
@@ -129,6 +124,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     .builder(withAPIKey: key)
                     .with(customerUserId: userID)
                     .with(serverCluster: await adaptyServerClusterForCurrentUser())
+                    .with(observerMode: isRunningInChina)
                     .build()
                 try await adapty.activate(with: configuration)
                 try await adaptyUI.activate()

@@ -58,6 +58,7 @@ class PaywallService: PaywallServiceProtocol {
     public var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol?)?
     
     var paywallData = [PaywallData]()
+    var isRunningInChina: Bool = false
     
     let purchaseService: PurchaseService
     let analyticsService: AnalyticsService
