@@ -10,8 +10,14 @@ import StoreKit
     
     lazy var _analytics = AnalyticsService()
     lazy var _purchases = PurchaseService()
-    lazy var _paywalls = PaywallService(purchaseService: _purchases, analyticsService: _analytics)
+    lazy var _paywalls = RegionalPaywallService(purchaseService: _purchases, analyticsService: _analytics)
     lazy var _remoteConfig = RemoteConfigService.shared
+    
+    public var viewIdentifiersByPlacement: [String: PaywallIdentifier] = [:] {
+        didSet {
+            _paywalls.viewIdentifiersByPlacement = viewIdentifiersByPlacement
+        }
+    }
     
     /// Set this value before accessing the `analytics`
     public var dataFetchComplete: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
@@ -23,8 +29,9 @@ import StoreKit
         
         _analytics.analyticsStarted = { options in
             Task {
-                let isRunningInChina = await self.isRunningInChina()
-                self._paywalls.isRunningInChina = isRunningInChina
+                let isRunningInChina = true
+//                await self.isRunningInChina()
+                self._paywalls.configure(isRunningInChina: isRunningInChina)
                 self._analytics.isRunningInChina = isRunningInChina
                 await self._analytics.firebaseSignIn(options)
                 
