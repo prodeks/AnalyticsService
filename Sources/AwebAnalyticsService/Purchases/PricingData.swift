@@ -4,17 +4,23 @@ public class PricingData {
     public let value: Double
     public let priceLocale: Locale
     public let currencySymbol: String
+    public let introOfferValue: Double?
+    public let introOfferLocalizedPrice: String?
     public let iap: any IAPProtocol
     
     init(
         value: Double,
         priceLocale: Locale,
         currencySymbol: String,
+        introOfferValue: Double? = nil,
+        introOfferLocalizedPrice: String? = nil,
         iap: any IAPProtocol
     ) {
         self.value = value
         self.priceLocale = priceLocale
         self.currencySymbol = currencySymbol
+        self.introOfferValue = introOfferValue
+        self.introOfferLocalizedPrice = introOfferLocalizedPrice
         self.iap = iap
     }
     
