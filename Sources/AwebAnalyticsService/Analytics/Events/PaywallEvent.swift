@@ -39,6 +39,15 @@ public class PaywallCheckoutCancelledEvent: PaywallEvent {
     }
 }
 
+public struct PaywallFetchErrorEvent: EventProtocol {
+    public var name: String { "paywall_fetch_error" }
+    let placement: String
+    let errorDescription: String
+    public var params: [String: Any] {
+        ["placement": placement, "error": errorDescription]
+    }
+}
+
 public struct OnboardingStartedEvent: EventProtocol {
     public var name: String {
         "Onboarding_Started"

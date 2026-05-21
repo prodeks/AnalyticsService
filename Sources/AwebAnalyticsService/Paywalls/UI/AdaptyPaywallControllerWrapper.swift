@@ -5,6 +5,7 @@ import AdaptyUI
 class AdaptyPaywallControllerWrapper: UIViewController, PaywallControllerProtocol {
     var dismissed: ((_ purchasedProductID: String?) -> Void)?
     var navigated: ((any PaywallPlacementProtocol) -> Void)?
+    var paywallScreenID: String? { nil }
     
     let wrappedController: AdaptyPaywallController
     let purchaseService: PurchaseService

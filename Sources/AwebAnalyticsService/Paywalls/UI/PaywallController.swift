@@ -7,6 +7,7 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     public var dismissed: ((_ purchasedProductID: String?) -> Void)?
     public var navigated: ((PaywallPlacementProtocol) -> Void)?
+    public var paywallScreenID: String? { paywallView.paywallID.rawValue }
     public var logOpen: (() -> Void)?
     public var logClose: (() -> Void)?
     

@@ -12,14 +12,16 @@ enum Log {
         
         var prefix: String {
             switch self {
-            case .analytics: return "--> [ANALYTICS]: "
-            case .debug: return "--> [DEBUG]: "
-            case .error: return "--> [ERROR]: "
+            case .analytics: return "[ANALYTICS]: "
+            case .debug: return "[DEBUG]: "
+            case .error: return "[ERROR]: "
             }
         }
     }
     
     static func printLog(l: Level, str: String) {
-        print("\(l.prefix)\(str)")
+        let message = "\(l.prefix)\(str)"
+        print(message)
+        logger.notice("\(message, privacy: .public)")
     }
 }
