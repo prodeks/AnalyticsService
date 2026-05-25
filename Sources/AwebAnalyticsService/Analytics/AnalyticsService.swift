@@ -127,6 +127,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                 let configuration = AdaptyConfiguration
                     .builder(withAPIKey: key)
+                    .with(logLevel: .verbose)
                     .with(customerUserId: userID)
                     .with(serverCluster: await adaptyServerClusterForCurrentUser())
                     .build()
