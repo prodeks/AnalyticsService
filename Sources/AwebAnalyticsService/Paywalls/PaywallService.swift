@@ -99,6 +99,7 @@ class PaywallService: PaywallServiceProtocol {
                         wrappedController: adaptyController,
                         purchaseService: purchaseService,
                         analyticsService: analyticsService,
+                        placement: adaptyBuilderData.placement,
                         proxy: proxy
                     )
                 } catch {

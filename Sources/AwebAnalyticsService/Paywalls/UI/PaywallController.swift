@@ -96,7 +96,8 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
         if let product = adaptyPaywallData.products.first(where: { $0.vendorProductId == iap.productID }) {
             purchaseService.purchaseAdaptyProduct(
                 product,
-                paywallID: paywallView.paywallID.rawValue
+                paywallID: paywallView.paywallID.rawValue,
+                placement: adaptyPaywallData.placement
             ) { [weak self] result in
                 guard let self = self else { return }
                 self.overlayView.isHidden = true

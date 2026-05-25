@@ -44,6 +44,20 @@ class PurchaseService: PurchaseServiceProtocol {
         paywallID: String,
         _ completion: @escaping (PurchaseResult) -> Void
     ) {
+        purchaseAdaptyProduct(
+            product,
+            paywallID: paywallID,
+            placement: paywallID,
+            completion
+        )
+    }
+    
+    func purchaseAdaptyProduct(
+        _ product: AdaptyPaywallProduct,
+        paywallID: String,
+        placement: String,
+        _ completion: @escaping (PurchaseResult) -> Void
+    ) {
         logEvent?(PaywallCheckoutStartedEvent(paywallID: paywallID))
         
         Adapty.makePurchase(product: product) { [weak self] purchaseResult in
@@ -52,7 +66,12 @@ class PurchaseService: PurchaseServiceProtocol {
             switch purchaseResult {
             case .success(let result):
                 if result.isPurchaseCancelled {
-                    self.handlePurchaseCancelled(product: product, paywallID: paywallID, completion: completion)
+                    self.handlePurchaseCancelled(
+                        product: product,
+                        paywallID: paywallID,
+                        placement: placement,
+                        completion: completion
+                    )
                 } else {
                     if let profile = result.profile {
                         self.updateSubscriptionState(from: profile)
@@ -60,7 +79,13 @@ class PurchaseService: PurchaseServiceProtocol {
                     completion(.success)
                 }
             case .failure(let error):
-                self.handlePurchaseFailure(error: error, product: product, paywallID: paywallID, completion: completion)
+                self.handlePurchaseFailure(
+                    error: error,
+                    product: product,
+                    paywallID: paywallID,
+                    placement: placement,
+                    completion: completion
+                )
             }
         }
     }
@@ -75,7 +100,15 @@ class PurchaseService: PurchaseServiceProtocol {
                 self?.updateSubscriptionState(from: profile)
                 let hasSub = profile.accessLevels["premium"]?.isActive ?? false
                 completion(hasSub)
-            case .failure:
+            case .failure(let error):
+                let metadata = PaywallFailureMetadata(error: error)
+                self?.logEvent?(
+                    RestoreFailedEvent(
+                        reason: metadata.reason,
+                        errorDomain: metadata.errorDomain,
+                        errorCode: metadata.errorCode
+                    )
+                )
                 completion(false)
             }
         }
@@ -99,19 +132,108 @@ class PurchaseService: PurchaseServiceProtocol {
         subscriptionStatus = accessLevel?.subscriptionStatus ?? .inactive
     }
     
-    private func handlePurchaseCancelled(product: AdaptyPaywallProduct, paywallID: String, completion: @escaping (PurchaseResult) -> Void) {
+    private func handlePurchaseCancelled(
+        product: AdaptyPaywallProduct,
+        paywallID: String,
+        placement: String,
+        completion: @escaping (PurchaseResult) -> Void
+    ) {
+        let metadata = PaywallFailureMetadata.cancelled
         logEvent?(PurchaseEvent.cancel(iap: (product.vendorProductId, Float(truncating: product.price as NSNumber))))
         logEvent?(PaywallCheckoutCancelledEvent(paywallID: paywallID))
+        logEvent?(
+            PurchaseFailedEvent(
+                reason: metadata.reason,
+                productID: product.vendorProductId,
+                placement: placement,
+                errorDomain: metadata.errorDomain,
+                errorCode: metadata.errorCode
+            )
+        )
         completion(.cancel)
     }
     
-    private func handlePurchaseFailure(error: AdaptyError, product: AdaptyPaywallProduct, paywallID: String, completion: @escaping (PurchaseResult) -> Void) {
+    private func handlePurchaseFailure(
+        error: AdaptyError,
+        product: AdaptyPaywallProduct,
+        paywallID: String,
+        placement: String,
+        completion: @escaping (PurchaseResult) -> Void
+    ) {
         if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {
-            handlePurchaseCancelled(product: product, paywallID: paywallID, completion: completion)
+            handlePurchaseCancelled(
+                product: product,
+                paywallID: paywallID,
+                placement: placement,
+                completion: completion
+            )
         } else {
+            let metadata = PaywallFailureMetadata(error: error)
             logEvent?(PurchaseEvent.fail(iap: (product.vendorProductId, error)))
+            logEvent?(
+                PurchaseFailedEvent(
+                    reason: metadata.reason,
+                    productID: product.vendorProductId,
+                    placement: placement,
+                    errorDomain: metadata.errorDomain,
+                    errorCode: metadata.errorCode
+                )
+            )
             completion(.fail)
         }
+    }
+}
+
+struct PaywallFailureMetadata {
+    let reason: String
+    let errorDomain: String
+    let errorCode: Int
+    
+    init(error: AdaptyError) {
+        let nsError = error as NSError
+        self.reason = Self.reason(error: error, nsError: nsError)
+        self.errorDomain = nsError.domain
+        self.errorCode = error.errorCode
+    }
+    
+    private init(reason: String, errorDomain: String, errorCode: Int) {
+        self.reason = reason
+        self.errorDomain = errorDomain
+        self.errorCode = errorCode
+    }
+    
+    static var cancelled: PaywallFailureMetadata {
+        PaywallFailureMetadata(
+            reason: "cancelled",
+            errorDomain: "AdaptyError",
+            errorCode: AdaptyError.ErrorCode.paymentCancelled.rawValue
+        )
+    }
+    
+    private static func reason(error: AdaptyError, nsError: NSError) -> String {
+        if error.errorCode == AdaptyError.ErrorCode.paymentCancelled.rawValue {
+            return "cancelled"
+        } else if isNetworkError(nsError) {
+            return "network_error"
+        } else {
+            return "payment_invalid"
+        }
+    }
+    
+    private static func isNetworkError(_ error: NSError) -> Bool {
+        if error.domain == NSURLErrorDomain {
+            return true
+        }
+        
+        if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? NSError {
+            return isNetworkError(underlyingError)
+        }
+        
+        if let underlyingError = error.userInfo[NSUnderlyingErrorKey] as? Error {
+            return isNetworkError(underlyingError as NSError)
+        }
+        
+        return false
     }
 }
 

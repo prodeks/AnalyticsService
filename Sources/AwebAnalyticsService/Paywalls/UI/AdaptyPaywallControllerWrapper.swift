@@ -10,17 +10,20 @@ class AdaptyPaywallControllerWrapper: UIViewController, PaywallControllerProtoco
     let wrappedController: AdaptyPaywallController
     let purchaseService: PurchaseService
     let analyticsService: AnalyticsService
+    let placement: String
     let proxy: AdaptyPaywallControllerDelegateProxy
     
     init(
         wrappedController: AdaptyPaywallController,
         purchaseService: PurchaseService,
         analyticsService: AnalyticsService,
+        placement: String,
         proxy: AdaptyPaywallControllerDelegateProxy
     ) {
         self.analyticsService = analyticsService
         self.wrappedController = wrappedController
         self.purchaseService = purchaseService
+        self.placement = placement
         self.proxy = proxy
         super.init(nibName: nil, bundle: nil)
         
@@ -168,6 +171,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         didFailPurchase product: AdaptyPaywallProduct,
         error: AdaptyError
     ) {
+        logPurchaseFailed(productID: product.vendorProductId, metadata: PaywallFailureMetadata(error: error))
         presentCannotPurchaseAlert()
     }
     
@@ -175,7 +179,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         _ controller: AdaptyPaywallController,
         didCancelPurchase product: AdaptyPaywallProduct
     ) {
-        
+        logPurchaseFailed(productID: product.vendorProductId, metadata: .cancelled)
     }
     
     public func paywallControllerDidStartRestore(
@@ -199,6 +203,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         _ controller: AdaptyPaywallController,
         didFailRestoreWith error: AdaptyError
     ) {
+        logRestoreFailed(metadata: PaywallFailureMetadata(error: error))
         presentNoPurchasesToRestoreAlert()
     }
     
@@ -241,5 +246,27 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         let n = UINavigationController(rootViewController: c)
         c.item = item
         present(n, animated: true)
+    }
+    
+    private func logPurchaseFailed(productID: String, metadata: PaywallFailureMetadata) {
+        analyticsService.log(
+            e: PurchaseFailedEvent(
+                reason: metadata.reason,
+                productID: productID,
+                placement: placement,
+                errorDomain: metadata.errorDomain,
+                errorCode: metadata.errorCode
+            )
+        )
+    }
+    
+    private func logRestoreFailed(metadata: PaywallFailureMetadata) {
+        analyticsService.log(
+            e: RestoreFailedEvent(
+                reason: metadata.reason,
+                errorDomain: metadata.errorDomain,
+                errorCode: metadata.errorCode
+            )
+        )
     }
 }
