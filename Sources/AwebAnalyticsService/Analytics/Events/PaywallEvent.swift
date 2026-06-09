@@ -186,16 +186,24 @@ public struct PricesFailedEvent: EventProtocol {
     /// The numeric error code from the underlying StoreKit error.
     let errorCode: Int
 
+    /// Product identifiers that failed to load from StoreKit.
+    let failedIdentifiers: [String]
+
     public var params: [String: Any] {
-        [
+        var result: [String: Any] = [
             "errorDomain": errorDomain,
             "errorCode": errorCode
         ]
+        if !failedIdentifiers.isEmpty {
+            result["failedIdentifiers"] = failedIdentifiers
+        }
+        return result
     }
 
-    public init(errorDomain: String, errorCode: Int) {
+    public init(errorDomain: String, errorCode: Int, failedIdentifiers: [String] = []) {
         self.errorDomain = errorDomain
         self.errorCode = errorCode
+        self.failedIdentifiers = failedIdentifiers
     }
 }
 

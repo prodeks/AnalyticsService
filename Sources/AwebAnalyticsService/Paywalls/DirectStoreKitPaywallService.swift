@@ -85,7 +85,10 @@ public final class DirectStoreKitPaywallService: PaywallServiceProtocol {
         do {
             let response = try await StoreKitProductsLoader(productIdentifiers: productIdentifiers).fetch()
             if !response.invalidProductIdentifiers.isEmpty {
-                logPricesFailed(metadata: PaywallAnalyticsError.invalidProductIdentifiers)
+                logPricesFailed(
+                    metadata: PaywallAnalyticsError.invalidProductIdentifiers,
+                    failedIdentifiers: response.invalidProductIdentifiers
+                )
                 Log.printLog(
                     l: .error,
                     str: "Invalid StoreKit product identifiers: \(response.invalidProductIdentifiers.joined(separator: ", "))"
@@ -106,11 +109,12 @@ public final class DirectStoreKitPaywallService: PaywallServiceProtocol {
         }
     }
     
-    private func logPricesFailed(metadata: AnalyticsErrorMetadata) {
+    private func logPricesFailed(metadata: AnalyticsErrorMetadata, failedIdentifiers: [String] = []) {
         logEvent?(
             PricesFailedEvent(
                 errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
+                errorCode: metadata.errorCode,
+                failedIdentifiers: failedIdentifiers
             )
         )
     }
