@@ -209,8 +209,9 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     
     public func paywallController(
         _ controller: AdaptyPaywallController,
-        didFailRenderingWith error: AdaptyError
+        didFailRenderingWith error: AdaptyUIError
     ) {
+        logPaywallFailed(metadata: AnalyticsErrorMetadata(error: error))
         dismissed?(nil)
     }
     
@@ -218,6 +219,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         _ controller: AdaptyPaywallController,
         didFailLoadingProductsWith error: AdaptyError
     ) -> Bool {
+        logPricesFailed(metadata: AnalyticsErrorMetadata(error: error))
         return false
     }
     
@@ -264,6 +266,25 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         analyticsService.log(
             e: RestoreFailedEvent(
                 reason: metadata.reason,
+                errorDomain: metadata.errorDomain,
+                errorCode: metadata.errorCode
+            )
+        )
+    }
+    
+    private func logPricesFailed(metadata: AnalyticsErrorMetadata) {
+        analyticsService.log(
+            e: PricesFailedEvent(
+                errorDomain: metadata.errorDomain,
+                errorCode: metadata.errorCode
+            )
+        )
+    }
+    
+    private func logPaywallFailed(metadata: AnalyticsErrorMetadata) {
+        analyticsService.log(
+            e: PaywallFailedEvent(
+                placement: placement,
                 errorDomain: metadata.errorDomain,
                 errorCode: metadata.errorCode
             )

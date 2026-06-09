@@ -3,7 +3,7 @@ import AdaptyUI
 import StoreKit
 import Adapty
 
-public protocol PaywallPlacementProtocol {
+public protocol PaywallPlacementProtocol: Hashable {
     var identifier: String { get }
 }
 
@@ -86,6 +86,10 @@ class PaywallService: PaywallServiceProtocol {
                         adaptyPaywallData: customPaywallData
                     )
                 } else {
+                    logPaywallFailed(
+                        placement: placement.identifier,
+                        metadata: PaywallAnalyticsError.customViewUnavailable
+                    )
                     return nil
                 }
             case .adaptyBuilder(let adaptyBuilderData):
@@ -104,10 +108,18 @@ class PaywallService: PaywallServiceProtocol {
                     )
                 } catch {
                     Log.printLog(l: .error, str: "Failed to create Adapty paywall controller: \(error)")
+                    logPaywallFailed(
+                        placement: placement.identifier,
+                        metadata: AnalyticsErrorMetadata(error: error)
+                    )
                     return nil
                 }
             }
         } else {
+            logPaywallFailed(
+                placement: placement.identifier,
+                metadata: PaywallAnalyticsError.missingPaywallData
+            )
             return nil
         }
     }
@@ -127,7 +139,14 @@ class PaywallService: PaywallServiceProtocol {
                             )
                         )
                     } else {
-                        let products = try await Adapty.getPaywallProducts(paywall: paywall)
+                        let products: [AdaptyPaywallProduct]
+                        do {
+                            products = try await Adapty.getPaywallProducts(paywall: paywall)
+                        } catch {
+                            self.logPricesFailed(metadata: AnalyticsErrorMetadata(error: error))
+                            throw error
+                        }
+                        
                         return .customPaywall(
                             CustomPaywallData(
                                 placement: identifier,
@@ -149,5 +168,24 @@ class PaywallService: PaywallServiceProtocol {
             .compactMap { $0 }
         
         self.paywallData = paywalls
+    }
+    
+    private func logPricesFailed(metadata: AnalyticsErrorMetadata) {
+        analyticsService.log(
+            e: PricesFailedEvent(
+                errorDomain: metadata.errorDomain,
+                errorCode: metadata.errorCode
+            )
+        )
+    }
+    
+    private func logPaywallFailed(placement: String, metadata: AnalyticsErrorMetadata) {
+        analyticsService.log(
+            e: PaywallFailedEvent(
+                placement: placement,
+                errorDomain: metadata.errorDomain,
+                errorCode: metadata.errorCode
+            )
+        )
     }
 }

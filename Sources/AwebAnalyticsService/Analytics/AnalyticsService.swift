@@ -18,56 +18,195 @@ import FirebaseFirestore
 import AdjustSdk
 import StoreKit
 
+// MARK: - Protocol
+
+/// The public interface for the analytics and attribution layer.
+///
+/// Conforming types are responsible for:
+/// - Initialising third-party SDKs (Firebase, Facebook, AppsFlyer, Adjust, Mixpanel,
+///   Adapty, Firebase Messaging) exactly once.
+/// - Forwarding `UIApplicationDelegate` lifecycle calls so each SDK can maintain its
+///   own session state.
+/// - Logging structured `EventProtocol` events to all active backends simultaneously.
+/// - Surfacing a reactive `userID` stream so other services can stay in sync with the
+///   Firebase anonymous auth UID.
+/// - Exposing the latest `attributionData` from whichever attribution source resolved
+///   most recently (Adjust, AppsFlyer, ASA, or deep link).
 public protocol AnalyticsServiceProtocol: AnyObject {
+
+    // MARK: App lifecycle
+
+    /// Configures all third-party analytics SDKs the first time it is called;
+    /// subsequent calls are no-ops for SDK setup but still invoke `analyticsStarted`.
+    ///
+    /// Call this from `application(_:didFinishLaunchingWithOptions:)` or as early as
+    /// possible in the app lifecycle so attribution tokens are captured before the
+    /// first session event fires.
     func setupAnalyticsIfNeeded(options: [UIApplication.LaunchOptionsKey: Any]?)
+
+    /// Convenience wrapper: forwards `didFinishLaunchingWithOptions` to the Facebook
+    /// SDK and then calls ``setupAnalyticsIfNeeded(options:)``.
     func didFinishLaunchingWithOptions(application: UIApplication, options: [UIApplication.LaunchOptionsKey: Any]?)
+
+    /// Notifies AppsFlyer and starts the `PurchaseConnector` transaction observer.
+    ///
+    /// Must be called from `applicationDidBecomeActive(_:)` on every foreground
+    /// transition so AppsFlyer sessions are correctly attributed.
     func applicationDidBecomeActive(_ application: UIApplication)
-    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any]) -> Bool
+
+    /// Forwards URL-scheme deep links to Adjust and the Facebook SDK.
+    ///
+    /// - Returns: `true` if the Facebook SDK handled the URL.
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any]) -> Bool
+
+    /// Forwards Universal Links to Adjust for deferred deep-link attribution.
+    ///
+    /// - Returns: `true` (always — the app is responsible for acting on the URL).
     func application(_application: UIApplication, continue userActivity: NSUserActivity) -> Bool
-    func application(_application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) -> Void
+
+    /// Forwards a remote notification payload to Firebase Messaging.
+    func application(_application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) -> Void
+
+    /// Passes the APNS device token to Firebase Messaging for FCM bridging.
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data)
-    
+
+    // MARK: Notifications
+
+    /// Requests `.alert`, `.badge`, and `.sound` authorisation and registers the
+    /// device for remote notifications.
     func registerForNotifications()
+
+    // MARK: Events
+
+    /// Logs `e` to all active analytics backends simultaneously.
+    ///
+    /// Backends: Firebase Analytics, Facebook App Events, AppsFlyer, Mixpanel.
+    /// Additionally logs a Facebook purchase revenue event for `PurchaseEvent.success`.
     func log(e: EventProtocol)
+
+    // MARK: Tracking
+
+    /// Presents the ATT permission dialog and propagates the result to Adapty.
+    ///
+    /// - Returns: The `ATTrackingManager.AuthorizationStatus` selected by the user.
     func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus
+
+    /// Updates Adapty's refund data consent flag.
+    ///
+    /// - Parameter granted: `true` to allow Adapty to collect refund data for
+    ///   revenue recovery features.
     func updateRefundDataConsent(granted: Bool) async
-    
+
+    // MARK: Publishers
+
+    /// Publishes the Firebase anonymous auth UID, starting with an empty string before
+    /// sign-in completes.
     var userID: AnyPublisher<String, Never> { get }
+
+    /// Mutable backing store for the Firebase UID. Exposed so the owning coordinator
+    /// can read the current value synchronously without subscribing to the publisher.
     var _userID: String { get set }
-    var attributionData: AnyPublisher<[AnyHashable : Any], Never> { get }
-    
+
+    /// Publishes the most recently received attribution dictionary.
+    ///
+    /// Sources (in priority order, last-write wins):
+    /// 1. AppsFlyer conversion data
+    /// 2. Adjust attribution callback
+    /// 3. Adjust deferred deep link
+    /// 4. URL-scheme / Universal Link deep link
+    var attributionData: AnyPublisher<[AnyHashable: Any], Never> { get }
+
+    // MARK: Push
+
+    /// The most recently received Firebase Cloud Messaging token, or `nil` if FCM
+    /// registration has not completed yet.
     var fcmToken: String? { get }
 }
 
+// MARK: - Implementation
+
+/// Central analytics hub that initialises, configures, and proxies to all third-party
+/// analytics and attribution SDKs.
+///
+/// ## SDK responsibilities
+///
+/// | SDK | Role |
+/// |---|---|
+/// | Firebase Analytics | Event logging and user identification |
+/// | Firebase Auth | Anonymous sign-in to obtain a stable user ID |
+/// | Firebase Messaging | FCM push token management |
+/// | Facebook SDK | Event logging and purchase revenue reporting |
+/// | AppsFlyer | Install attribution and event logging |
+/// | Adjust | Install attribution, SKAN conversion, deep links |
+/// | Mixpanel | Event logging with EU data residency |
+/// | Adapty | Subscription paywall config and entitlement management |
+/// | AdaptyUI | Paywall rendering layer on top of Adapty |
+///
+/// ## Initialisation sequence
+///
+/// 1. `setupAnalyticsIfNeeded(options:)` — one-time SDK configuration.
+/// 2. `firebaseSignIn(_:)` — anonymous Firebase Auth sign-in; on success activates
+///    Adapty (selecting the China cluster when needed) and registers cross-SDK user
+///    identifiers.
+/// 3. `initAdjust()` — starts the Adjust SDK and forwards the Adjust device ID and
+///    attribution to Adapty.
+/// 4. `applicationDidBecomeActive(_:)` — starts the AppsFlyer session.
+///
+/// ## China region support
+///
+/// When `isRunningInChina` is `true`, Adapty is configured with the `.cn` server
+/// cluster and `observerMode: true` so that direct StoreKit transactions are used
+/// instead of Adapty-managed purchases.
 class AnalyticsService: NSObject, AnalyticsServiceProtocol {
+
+    // MARK: - Private SDK references
 
     private let firebase = Analytics.self
     private let adapty = Adapty.self
     private let adaptyUI = AdaptyUI.self
     private let appsflyer = AppsFlyerLib.shared()
     private let purchaseConnector = PurchaseConnector.shared()
-    
+
+    // MARK: - Public properties
+
     var fcmToken: String? = ""
-    
+
+    /// Set to `true` before `setupAnalyticsIfNeeded` is called when the app detects
+    /// the user is running in the Chinese App Store.
+    var isRunningInChina: Bool = false
+
     @Published public var _userID = ""
     public var userID: AnyPublisher<String, Never> {
         $_userID.eraseToAnyPublisher()
     }
-    @Published private var _attributionData = [AnyHashable : Any]()
-    public var attributionData: AnyPublisher<[AnyHashable : Any], Never> {
+
+    @Published private var _attributionData = [AnyHashable: Any]()
+    public var attributionData: AnyPublisher<[AnyHashable: Any], Never> {
         $_attributionData.eraseToAnyPublisher()
     }
-    
+
+    /// Optional hook invoked at the end of ``setupAnalyticsIfNeeded(options:)`` on
+    /// every call (including subsequent no-op calls).
+    ///
+    /// Allows the host app to perform work that depends on the analytics layer being
+    /// ready (e.g. starting `firebaseSignIn`) without subclassing `AnalyticsService`.
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
+
+    /// Guards against running the SDK setup block more than once.
     private var didSetupAnalytics = false
-    
+
+    // MARK: - App lifecycle
+
     public func setupAnalyticsIfNeeded(options: [UIApplication.LaunchOptionsKey: Any]?) {
         if !didSetupAnalytics {
+            // Facebook SDK — must be configured before any AppEvents calls
             Settings.shared.appID = PurchasesAndAnalytics.Keys.facebookAppId
             Settings.shared.clientToken = PurchasesAndAnalytics.Keys.facebookClientToken
             Settings.shared.isAutoLogAppEventsEnabled = true
             Settings.shared.isAdvertiserIDCollectionEnabled = true
 
+            // AppsFlyer — `waitForATTUserAuthorization` defers the install ping until
+            // the ATT prompt result is known, maximising attributed installs.
             appsflyer.appsFlyerDevKey = PurchasesAndAnalytics.Keys.appsflyerKey ?? ""
             appsflyer.appleAppID = PurchasesAndAnalytics.Keys.appID ?? ""
             appsflyer.delegate = self
@@ -77,23 +216,24 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             purchaseConnector.purchaseRevenueDelegate = self
             purchaseConnector.purchaseRevenueDataSource = self
             purchaseConnector.autoLogPurchaseRevenue = .autoRenewableSubscriptions
-            
+
             FirebaseApp.configure()
-            
+
+            // Mixpanel — EU endpoint used for GDPR compliance.
             Mixpanel.initialize(
                 token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "",
                 trackAutomaticEvents: false,
                 serverURL: "https://api-eu.mixpanel.com"
             )
             Mixpanel.mainInstance().loggingEnabled = true
-            
+
             Messaging.messaging().delegate = self
             didSetupAnalytics = true
         }
 
         analyticsStarted?(options)
     }
-    
+
     public func didFinishLaunchingWithOptions(
         application: UIApplication,
         options: [UIApplication.LaunchOptionsKey: Any]?
@@ -102,67 +242,78 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             application,
             didFinishLaunchingWithOptions: options
         )
-        
+
         setupAnalyticsIfNeeded(options: options)
     }
-    
-    /// Chooses Adapty’s China cluster per [China cluster docs](https://adapty.io/docs/china-cluster?current-os=swift): storefront `CHN` first, then device region `CN` (e.g. Simulator may lack a storefront).
-    private func adaptyServerClusterForCurrentUser() async -> AdaptyServerCluster {
-        if await Storefront.current?.countryCode == "CHN" {
-            return .cn
-        }
-        if Locale.current.region?.identifier == "CN" {
-            return .cn
-        }
-        return .default
-    }
-    
-    func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey : Any]?) async {
+
+    // MARK: - Firebase sign-in & Adapty activation
+
+    /// Signs in anonymously with Firebase, then activates Adapty and registers
+    /// cross-SDK user identifiers so attribution data can be joined server-side.
+    ///
+    /// Called by the host app's coordinator after ``setupAnalyticsIfNeeded(options:)``
+    /// completes. The method is idempotent — Firebase reuses the cached anonymous
+    /// credential on subsequent calls.
+    func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey: Any]?) async {
         do {
             let signInResult = try await Auth.auth().signInAnonymously()
             let userID = signInResult.user.uid
             firebase.setUserID(userID)
             _userID = userID
             appsflyer.customerUserID = userID
+
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                 let configuration = AdaptyConfiguration
                     .builder(withAPIKey: key)
                     .with(logLevel: .verbose)
                     .with(customerUserId: userID)
                     .with(serverCluster: await adaptyServerClusterForCurrentUser())
+                    // observerMode: true in China so Adapty does not intercept
+                    // StoreKit transactions — the app manages purchases directly.
+                    .with(observerMode: isRunningInChina)
                     .build()
                 try await adapty.activate(with: configuration)
                 try await adaptyUI.activate()
-                
-                // Set default refund data consent
+
                 try await adapty.updateCollectingRefundDataConsent(true)
-                
+
+                // Register cross-SDK identifiers so Adapty can join events from
+                // Firebase, Mixpanel, and Facebook in its analytics pipelines.
                 if let appInstanceId = Analytics.appInstanceID() {
                     try await Adapty.setIntegrationIdentifier(
                         key: "firebase_app_instance_id",
                         value: appInstanceId
                     )
                 }
-                
+
                 try await Adapty.setIntegrationIdentifier(
                     key: "mixpanel_user_id",
                     value: Mixpanel.mainInstance().distinctId
                 )
-                
+
                 try await Adapty.setIntegrationIdentifier(
                     key: "facebook_anonymous_id",
                     value: AppEvents.shared.anonymousID
                 )
-                
-                initAdjust()
+
+//                initAdjust()
             }
         } catch {
             Log.printLog(l: .error, str: error.localizedDescription)
         }
     }
-    
+
+    // MARK: - Adjust initialisation
+
+    /// Initialises the Adjust SDK with environment-appropriate settings and forwards
+    /// the resolved attribution and device ID to Adapty.
+    ///
+    /// Debug builds use `ADJEnvironmentSandbox` with verbose logging; release builds
+    /// use `ADJEnvironmentProduction` with logging suppressed. After `initSdk` returns,
+    /// the device's Adjust ID and existing attribution are fetched asynchronously and
+    /// reported to Adapty and the attribution webhook.
     func initAdjust() {
-        
+
 #if DEBUG
         let environment = ADJEnvironmentSandbox
         let adjustConfig = ADJConfig(
@@ -178,9 +329,9 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         adjustConfig?.logLevel = ADJLogLevel.suppress
         adjustConfig?.delegate = self
 #endif
-        
+
         Adjust.initSdk(adjustConfig)
-        
+
         Task {
             let (adid, attribution) = await (Adjust.adid(), Adjust.attribution()?.dictionary())
             do {
@@ -191,8 +342,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     try await Adapty.updateAttribution(attribution, source: "adjust")
                     _attributionData = attribution
                 }
-                
-                // Log adjust info
+
                 let firebaseAppInstanceId = Analytics.appInstanceID() ?? ""
                 await sendAttributionWebhook(
                     storeId: PurchasesAndAnalytics.Keys.appID ?? "",
@@ -206,7 +356,15 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             }
         }
     }
-    
+
+    // MARK: - Attribution webhook
+
+    /// POSTs a combined attribution snapshot to the internal attribution aggregation
+    /// service so that install-level data from multiple sources is centralised.
+    ///
+    /// The payload joins the App Store product ID, Firebase instance ID, Adjust device
+    /// ID, and the raw attribution dictionary. Failures are logged but do not affect
+    /// the user experience.
     private func sendAttributionWebhook(
         storeId: String,
         firebaseAppInstanceId: String,
@@ -216,17 +374,17 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     ) async {
         let webhookURL = "https://adapty-attributions-420095526567.europe-west1.run.app/webhook"
         let authToken = "1dac2f40da774e43344f88eaee0ad566742d73f803f0a88d42626b803d55b085"
-        
+
         guard let url = URL(string: webhookURL) else {
             Log.printLog(l: .error, str: "Invalid webhook URL")
             return
         }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(authToken, forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let payload: [String: Any] = [
             "store_id": storeId,
             "firebase_app_instance_id": firebaseAppInstanceId,
@@ -234,12 +392,12 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             "source": source,
             "attribution": attribution
         ]
-        
+
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-            
+
             let (_, response) = try await URLSession.shared.data(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 200 {
                     Log.printLog(l: .debug, str: "Attribution webhook sent successfully")
@@ -251,7 +409,9 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             Log.printLog(l: .error, str: "Failed to send attribution webhook: \(error.localizedDescription)")
         }
     }
-    
+
+    // MARK: - Notifications
+
     public func registerForNotifications() {
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (granted, error) in
@@ -259,21 +419,23 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         }
         UIApplication.shared.registerForRemoteNotifications()
     }
-    
+
+    // MARK: - URL / deep-link handling
+
     public func application(
         _ app: UIApplication,
         open url: URL,
-        options: [UIApplication.OpenURLOptionsKey : Any]
+        options: [UIApplication.OpenURLOptionsKey: Any]
     ) -> Bool {
-        // Forward deep link to Adjust for attribution
+        // Forward to Adjust for URL-scheme attribution tracking
         if let adjustDeeplink = ADJDeeplink(deeplink: url) {
             Adjust.processDeeplink(adjustDeeplink)
         }
         Log.printLog(l: .debug, str: "Adjust URL scheme deep link processed: \(url.absoluteString)")
-        
-        // Store direct deep link for app to handle
+
+        // Store the raw URL so the app coordinator can route the deep link
         _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: url.absoluteString]
-        
+
         return ApplicationDelegate.shared.application(
             app,
             open: url,
@@ -288,12 +450,20 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     ) {
         Messaging.messaging().apnsToken = deviceToken
     }
-    
+
     public func applicationDidBecomeActive(_ application: UIApplication) {
         appsflyer.start()
         purchaseConnector.startObservingTransactions()
     }
-    
+
+    // MARK: - ATT
+
+    /// Presents the system ATT authorisation dialog and propagates the result to
+    /// Adapty so paywall personalisation can respect the user's tracking preference.
+    ///
+    /// IDFA, IDFV, and the ASA attribution token are logged at `.debug` level for
+    /// diagnostics but are not stored or forwarded beyond what the SDKs handle
+    /// internally.
     public func reqeuestATT() async -> ATTrackingManager.AuthorizationStatus {
         return await withCheckedContinuation { c in
             ATTrackingManager.requestTrackingAuthorization { status in
@@ -318,45 +488,59 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             }
         }
     }
-    
+
+    // MARK: - Universal Links
+
     public func application(
         _application: UIApplication,
         continue userActivity: NSUserActivity
     ) -> Bool {
         if userActivity.activityType == NSUserActivityTypeBrowsingWeb,
            let url = userActivity.webpageURL {
-            
+
             if let adjustDeeplink = ADJDeeplink(deeplink: url) {
                 Adjust.processDeeplink(adjustDeeplink)
                 Log.printLog(l: .debug, str: "Adjust Universal Link processed: \(url.absoluteString)")
-                
-                // Store direct deep link for app to handle
+
                 _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: url.absoluteString]
             }
         }
         return true
     }
-    
+
+    // MARK: - Remote notifications
+
     public func application(
         _application: UIApplication,
-        didReceiveRemoteNotification userInfo: [AnyHashable : Any]
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any]
     ) {
         Messaging.messaging().appDidReceiveMessage(userInfo)
     }
-    
+
+    // MARK: - Event logging
+
+    /// Fans out the event to every active analytics backend.
+    ///
+    /// - Firebase Analytics: `logEvent(_:parameters:)` with the raw param dictionary.
+    /// - Facebook App Events: params are re-keyed as `AppEvents.ParameterName`; for
+    ///   `PurchaseEvent.success` an additional `logPurchase(amount:currency:)` call is
+    ///   made so Facebook can model purchase revenue.
+    /// - AppsFlyer: `logEvent(_:withValues:)`.
+    /// - Mixpanel: all values are coerced to `String` via `String(describing:)` because
+    ///   Mixpanel's Swift API requires `[String: MixpanelType]`.
     public func log(e: EventProtocol) {
-    
+
         Log.printLog(l: .analytics, str: e.name + " \(e.params)")
-        
+
         firebase.logEvent(e.name, parameters: e.params)
-        
+
         var fbParams: [AppEvents.ParameterName: Any] = [:]
         e.params.forEach { k, v in
             fbParams[AppEvents.ParameterName.init(k)] = v
         }
-        
+
         AppEvents.shared.logEvent(AppEvents.Name(e.name), parameters: fbParams)
-        
+
         if let purchaseEvent = e as? PurchaseEvent,
             case let .success(iap) = purchaseEvent {
             AppEvents.shared.logPurchase(
@@ -364,12 +548,14 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 currency: "USD"
             )
         }
-        
+
         appsflyer.logEvent(e.name, withValues: e.params)
-        
+
         let params = e.params.mapValues { String.init(describing: $0) }
         Mixpanel.mainInstance().track(event: e.name, properties: params)
     }
+
+    // MARK: - Consent
 
     public func updateRefundDataConsent(granted: Bool) async {
         do {
@@ -379,9 +565,24 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             Log.printLog(l: .error, str: "Failed to update Adapty refund data consent: \(error.localizedDescription)")
         }
     }
+
+    // MARK: - Private helpers
+
+    /// Returns the Adapty server cluster appropriate for the current user.
+    ///
+    /// Chooses `.cn` when `isRunningInChina` is `true`, per the
+    /// [Adapty China cluster docs](https://adapty.io/docs/china-cluster?current-os=swift).
+    private func adaptyServerClusterForCurrentUser() async -> AdaptyServerCluster {
+        return await isRunningInChina ? .cn : .default
+    }
 }
 
+// MARK: - UNUserNotificationCenterDelegate
+
 extension AnalyticsService: UNUserNotificationCenterDelegate {
+
+    /// Calls the completion handler immediately; notification response handling is
+    /// delegated to the host app.
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
@@ -391,6 +592,9 @@ extension AnalyticsService: UNUserNotificationCenterDelegate {
             completionHandler()
         }
     }
+
+    /// Presents the notification as a banner, badge, and sound while the app is in
+    /// the foreground. Also logs the notification's `userInfo` for diagnostics.
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
@@ -404,7 +608,12 @@ extension AnalyticsService: UNUserNotificationCenterDelegate {
     }
 }
 
+// MARK: - MessagingDelegate
+
 extension AnalyticsService: MessagingDelegate {
+
+    /// Stores the newly issued FCM registration token so the host app can subscribe
+    /// the device to push topics or upload it to the server.
     public func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         if let fcmToken {
             Log.printLog(l: .debug, str: "Did receive FCM token - \(fcmToken)")
@@ -413,27 +622,40 @@ extension AnalyticsService: MessagingDelegate {
     }
 }
 
+// MARK: - AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseRevenueDelegate, PurchaseRevenueDataSource
+
 extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseRevenueDelegate, PurchaseRevenueDataSource {
-    public func onConversionDataSuccess(_ conversionInfo: [AnyHashable : Any]) {
+
+    /// Called when AppsFlyer resolves install attribution data.
+    ///
+    /// The conversion info is published via `attributionData` and also forwarded to
+    /// Adapty so paywall personalisation can use campaign-level data.
+    public func onConversionDataSuccess(_ conversionInfo: [AnyHashable: Any]) {
         _attributionData = conversionInfo
-        
+
         let afUID = AppsFlyerLib.shared().getAppsFlyerUID()
         Adapty.setIntegrationIdentifier(key: "appsflyer_id", value: afUID)
         Adapty.updateAttribution(conversionInfo, source: "appsflyer")
     }
-    
+
     public func onConversionDataFail(_ error: any Error) {
         Log.printLog(l: .error, str: error.localizedDescription)
     }
 
+    /// Called when AppsFlyer resolves a OneLink deep link.
+    ///
+    /// The `deeplinkValue` is published via `attributionData` so the app coordinator
+    /// can navigate to the appropriate screen.
     public func didResolveDeepLink(_ result: DeepLinkResult) {
         if let deeplinkValue = result.deepLink?.deeplinkValue {
             _attributionData = ["deep_link_value": deeplinkValue]
         }
     }
-    
+
+    /// Logs the server-side revenue validation result for diagnostics; no action is
+    /// taken on the validation outcome.
     public func didReceivePurchaseRevenueValidationInfo(
-        _ validationInfo: [AnyHashable : Any]?,
+        _ validationInfo: [AnyHashable: Any]?,
         error: (any Error)?
     ) {
         if let validationInfo {
@@ -443,60 +665,47 @@ extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseReve
             Log.printLog(l: .error, str: error.localizedDescription)
         }
     }
-    
+
+    /// Returns `nil` to indicate that no additional custom parameters should be
+    /// attached to AppsFlyer purchase revenue events.
     public func purchaseRevenueAdditionalParameters(
         for products: Set<SKProduct>,
         transactions: Set<SKPaymentTransaction>?
-    ) -> [AnyHashable : Any]? {
+    ) -> [AnyHashable: Any]? {
         return nil
     }
 }
 
 // MARK: - AdjustDelegate
+
 extension AnalyticsService: AdjustDelegate {
+
+    /// Called whenever Adjust's install attribution changes (e.g. after a deferred
+    /// deep link resolves or an organic install is re-attributed).
+    ///
+    /// All non-nil attribution fields are packed into a flat dictionary and:
+    /// 1. Published via `attributionData` for the app coordinator.
+    /// 2. Forwarded to Adapty for paywall personalisation.
     public func adjustAttributionChanged(_ attribution: ADJAttribution?) {
         Log.printLog(l: .debug, str: "Adjust attribution changed: \(String(describing: attribution))")
-        
+
         guard let attribution else { return }
-        
-        // Build attribution dictionary with all available data
+
         var attributionDict: [AnyHashable: Any] = [:]
-        
-        if let trackerToken = attribution.trackerToken {
-            attributionDict["tracker_token"] = trackerToken
-        }
-        if let trackerName = attribution.trackerName {
-            attributionDict["tracker_name"] = trackerName
-        }
-        if let network = attribution.network {
-            attributionDict["network"] = network
-        }
-        if let campaign = attribution.campaign {
-            attributionDict["campaign"] = campaign
-        }
-        if let adgroup = attribution.adgroup {
-            attributionDict["adgroup"] = adgroup
-        }
-        if let creative = attribution.creative {
-            attributionDict["creative"] = creative
-        }
-        if let clickLabel = attribution.clickLabel {
-            attributionDict["click_label"] = clickLabel
-        }
-        if let costType = attribution.costType {
-            attributionDict["cost_type"] = costType
-        }
-        if let costAmount = attribution.costAmount {
-            attributionDict["cost_amount"] = costAmount
-        }
-        if let costCurrency = attribution.costCurrency {
-            attributionDict["cost_currency"] = costCurrency
-        }
-        
-        // Update attribution data - this will trigger subscribers in AppCoordinator
+
+        if let trackerToken = attribution.trackerToken { attributionDict["tracker_token"] = trackerToken }
+        if let trackerName  = attribution.trackerName  { attributionDict["tracker_name"]  = trackerName  }
+        if let network      = attribution.network      { attributionDict["network"]        = network      }
+        if let campaign     = attribution.campaign     { attributionDict["campaign"]       = campaign     }
+        if let adgroup      = attribution.adgroup      { attributionDict["adgroup"]        = adgroup      }
+        if let creative     = attribution.creative     { attributionDict["creative"]       = creative     }
+        if let clickLabel   = attribution.clickLabel   { attributionDict["click_label"]    = clickLabel   }
+        if let costType     = attribution.costType     { attributionDict["cost_type"]      = costType     }
+        if let costAmount   = attribution.costAmount   { attributionDict["cost_amount"]    = costAmount   }
+        if let costCurrency = attribution.costCurrency { attributionDict["cost_currency"]  = costCurrency }
+
         _attributionData = attributionDict
-        
-        // Also update Adapty with the attribution
+
         Task {
             do {
                 try await Adapty.updateAttribution(attributionDict, source: "adjust")
@@ -505,21 +714,24 @@ extension AnalyticsService: AdjustDelegate {
             }
         }
     }
-    
-    public func adjustSkanUpdated(withConversionData data: [String : String]) {
+
+    /// Called when the SKAdNetwork conversion value is updated by Adjust.
+    ///
+    /// SKAN data is informational only; no further action is taken here.
+    public func adjustSkanUpdated(withConversionData data: [String: String]) {
         Log.printLog(l: .debug, str: "Adjust SKAN updated: \(data)")
-        // SKAN data is for iOS conversion tracking, merge with existing attribution if needed
     }
-    
+
+    /// Called when Adjust resolves a deferred deep link after install.
+    ///
+    /// Returns `false` to prevent Adjust from opening the URL automatically — the app
+    /// coordinator is responsible for routing based on the published `attributionData`.
     public func adjustDeferredDeeplinkReceived(_ deeplink: URL?) -> Bool {
         Log.printLog(l: .debug, str: "Adjust deferred deeplink received: \(String(describing: deeplink))")
-        
+
         if let deeplink {
-            // Store the deferred deeplink URL
             _attributionData = [PurchasesAndAnalytics.Keys.adjustDeeplinkKey: deeplink.absoluteString]
         }
-        // Return false to prevent Adjust from opening the URL automatically
-        // The app will handle navigation based on attribution data
         return false
     }
 }

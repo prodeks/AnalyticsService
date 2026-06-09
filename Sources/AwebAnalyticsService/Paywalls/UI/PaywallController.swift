@@ -152,7 +152,11 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
             preferredStyle: .alert
         )
         alert.addAction(.init(title: PurchasesAndAnalytics.Strings.cancel, style: .cancel))
-        present(alert, animated: true)
+        if let presented = presentedViewController { 
+            presented.present(alert, animated: true)
+        } else {
+            present(alert, animated: true)
+        }
     }
     
     func presentCannotPurchaseAlert() {
@@ -162,13 +166,21 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
             preferredStyle: .alert
         )
         alert.addAction(.init(title: PurchasesAndAnalytics.Strings.cancel, style: .cancel))
-        present(alert, animated: true)
+        if let presented = presentedViewController { 
+            presented.present(alert, animated: true)
+        } else {
+            present(alert, animated: true)
+        }
     }
     
     func presentPolicyItem(_ item: URLConvertable) {
         let c = WebViewController()
         let n = UINavigationController(rootViewController: c)
         c.item = item
-        present(n, animated: true)
+        if let presented = presentedViewController {
+            presented.present(n, animated: true)
+        } else {
+            present(n, animated: true)
+        }
     }
 }
