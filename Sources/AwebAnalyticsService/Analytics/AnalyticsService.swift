@@ -17,6 +17,7 @@ import Mixpanel
 import FirebaseFirestore
 import AdjustSdk
 import StoreKit
+import Sentry
 
 // MARK: - Protocol
 
@@ -238,6 +239,31 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         application: UIApplication,
         options: [UIApplication.LaunchOptionsKey: Any]?
     ) {
+        
+        SentrySDK.start { options in
+            options.dsn = PurchasesAndAnalytics.Keys.sentryDSN
+            options.releaseName = PurchasesAndAnalytics.Keys.sentryReleseName
+            // Adds IP for users.
+             // For more information, visit: https://docs.sentry.io/platforms/apple/data-management/data-collected/
+             options.sendDefaultPii = true
+             // Set tracesSampleRate to 1 to capture 100% of transactions for performance monitoring.
+             // We recommend adjusting this value in production.
+             options.tracesSampleRate = 1
+             options.configureProfiling = {
+                 $0.lifecycle = .trace
+                 $0.sessionSampleRate = 1
+             }
+             // Record session replays for 100% of errors and 10% of sessions
+             options.sessionReplay.onErrorSampleRate = 1.0
+             options.sessionReplay.sessionSampleRate = 0.1
+#if DEBUG
+            options.environment = "debug"
+            options.debug = true
+#else
+            options.environment = "production"
+#endif
+        }
+        
         ApplicationDelegate.shared.application(
             application,
             didFinishLaunchingWithOptions: options
@@ -261,7 +287,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             firebase.setUserID(userID)
             _userID = userID
             appsflyer.customerUserID = userID
-
+            SentrySDK.setUser(.init(userId: userID))
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                 let configuration = AdaptyConfiguration
                     .builder(withAPIKey: key)

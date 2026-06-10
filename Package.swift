@@ -15,12 +15,14 @@ let package = Package(
         .package(url: "https://github.com/adaptyteam/AdaptySDK-iOS.git", exact: Version(3, 15, 7)),
         .package(url: "https://github.com/AppsFlyerSDK/PurchaseConnector-Dynamic", exact: .init(6, 15, 3)),
         .package(url: "https://github.com/mixpanel/mixpanel-swift.git", exact: .init(5, 0, 0)),
-        .package(url: "https://github.com/adjust/ios_sdk", exact: .init(5, 5, 0))
+        .package(url: "https://github.com/adjust/ios_sdk", exact: .init(5, 5, 0)),
+        .package(url: "https://github.com/getsentry/sentry-cocoa.git", exact: .init(9, 16, 1))
     ],
     targets: [
         .target(
             name: "AwebAnalyticsService",
             dependencies: [
+                .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "FacebookCore", package: "facebook-ios-sdk"),
                 .product(name: "FirebaseRemoteConfig", package: "firebase-ios-sdk"),
                 .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),

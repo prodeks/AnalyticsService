@@ -10,6 +10,8 @@ extension PurchasesAndAnalytics {
         public static var mixPanelToken: String?
         public static var facebookAppId: String?
         public static var facebookClientToken: String?
+        public static var sentryDSN: String?
+        public static var sentryReleseName: String?
         
         // Attribution data keys
         public static let adjustDeeplinkKey = "adjust_deeplink"
