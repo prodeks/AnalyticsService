@@ -12,7 +12,7 @@ public final class DirectStoreKitPaywallService: PaywallServiceProtocol {
     
     private let purchaseService: PurchaseServiceProtocol
     private let logEvent: ((EventProtocol) -> Void)?
-    private var productsByIdentifier = [String: SKProduct]()
+    private var productsByIdentifier = [String: StoreKit.Product]()
     
     public init(
         purchaseService: PurchaseServiceProtocol,
@@ -69,51 +69,74 @@ public final class DirectStoreKitPaywallService: PaywallServiceProtocol {
         return DirectStoreKitPaywallController(
             purchaseService: purchaseService,
             paywallView: view,
-            productsByIdentifier: productsByIdentifier
+            productsByIdentifier: productsByIdentifier,
+            presentationContext: PaywallPresentationContext(
+                paywallID: view.paywallID.rawValue,
+                placement: placement.identifier,
+                source: .storeKit
+            ),
+            logEvent: { [logEvent] event in
+                logEvent?(event)
+            }
         )
     }
     
     public func fetchProducts() async {
         let productIdentifiers = Set(purchaseService.iaps.map(\.productID))
         guard !productIdentifiers.isEmpty else {
+            let description = "Direct StoreKit product identifiers are not configured"
             productsByIdentifier = [:]
-            Log.printLog(l: .error, str: "Direct StoreKit product identifiers are not configured")
+            Log.printLog(l: .error, str: description)
             logPricesFailed(metadata: PaywallAnalyticsError.missingProductIdentifiers)
+            logPaywallFetchError(
+                metadata: PaywallAnalyticsError.missingProductIdentifiers,
+                description: description
+            )
             return
         }
         
         do {
-            let response = try await StoreKitProductsLoader(productIdentifiers: productIdentifiers).fetch()
-            if !response.invalidProductIdentifiers.isEmpty {
+            let products = try await Product.products(for: productIdentifiers)
+            let loadedIdentifiers = Set(products.map(\.id))
+            let invalidProductIdentifiers = productIdentifiers.subtracting(loadedIdentifiers).sorted()
+            if !invalidProductIdentifiers.isEmpty {
                 logPricesFailed(
                     metadata: PaywallAnalyticsError.invalidProductIdentifiers,
-                    failedIdentifiers: response.invalidProductIdentifiers
+                    failedIdentifiers: invalidProductIdentifiers
                 )
                 Log.printLog(
                     l: .error,
-                    str: "Invalid StoreKit product identifiers: \(response.invalidProductIdentifiers.joined(separator: ", "))"
+                    str: "Invalid StoreKit product identifiers: \(invalidProductIdentifiers.joined(separator: ", "))"
                 )
             }
             
-            if response.products.isEmpty {
+            if products.isEmpty {
+                let description = "Direct StoreKit products are not loaded"
                 logPricesFailed(metadata: PaywallAnalyticsError.productsNotLoaded)
+                logPaywallFetchError(
+                    metadata: PaywallAnalyticsError.productsNotLoaded,
+                    description: description
+                )
             }
             
             productsByIdentifier = Dictionary(
-                uniqueKeysWithValues: response.products.map { ($0.productIdentifier, $0) }
+                uniqueKeysWithValues: products.map { ($0.id, $0) }
             )
         } catch {
+            let description = "Failed to fetch StoreKit products: \(error.localizedDescription)"
+            let metadata = AnalyticsErrorMetadata(error: error)
             productsByIdentifier = [:]
-            logPricesFailed(metadata: AnalyticsErrorMetadata(error: error))
-            Log.printLog(l: .error, str: "Failed to fetch StoreKit products: \(error.localizedDescription)")
+            logPricesFailed(metadata: metadata)
+            logPaywallFetchError(metadata: metadata, description: description)
+            Log.printLog(l: .error, str: description)
         }
     }
     
     private func logPricesFailed(metadata: AnalyticsErrorMetadata, failedIdentifiers: [String] = []) {
         logEvent?(
             PricesFailedEvent(
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode,
+                source: .storeKit,
+                metadata: metadata,
                 failedIdentifiers: failedIdentifiers
             )
         )
@@ -122,57 +145,25 @@ public final class DirectStoreKitPaywallService: PaywallServiceProtocol {
     private func logPaywallFailed(placement: String, metadata: AnalyticsErrorMetadata) {
         logEvent?(
             PaywallFailedEvent(
+                source: .storeKit,
                 placement: placement,
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
+                metadata: metadata
             )
         )
     }
-}
 
-private final class StoreKitProductsLoader: NSObject, SKProductsRequestDelegate {
-    
-    private let productIdentifiers: Set<String>
-    private var request: SKProductsRequest?
-    private var continuation: CheckedContinuation<SKProductsResponse, Error>?
-    
-    init(productIdentifiers: Set<String>) {
-        self.productIdentifiers = productIdentifiers
-    }
-    
-    func fetch() async throws -> SKProductsResponse {
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { continuation in
-                self.continuation = continuation
-                
-                let request = SKProductsRequest(productIdentifiers: productIdentifiers)
-                request.delegate = self
-                self.request = request
-                request.start()
-            }
-        } onCancel: {
-            request?.cancel()
+    private func logPaywallFetchError(metadata: AnalyticsErrorMetadata, description: String) {
+        let affectedPlacements = placements.isEmpty ? ["unknown"] : placements
+        for placement in affectedPlacements {
+            logEvent?(
+                PaywallFetchErrorEvent(
+                    source: .storeKit,
+                    placement: placement,
+                    errorDescription: description,
+                    errorDomain: metadata.errorDomain,
+                    errorCode: metadata.errorCode
+                )
+            )
         }
-    }
-    
-    func productsRequest(_ request: SKProductsRequest, didReceive response: SKProductsResponse) {
-        finish(with: .success(response))
-    }
-    
-    func request(_ request: SKRequest, didFailWithError error: Error) {
-        finish(with: .failure(error))
-    }
-    
-    private func finish(with result: Result<SKProductsResponse, Error>) {
-        request = nil
-        
-        switch result {
-        case .success(let response):
-            continuation?.resume(returning: response)
-        case .failure(let error):
-            continuation?.resume(throwing: error)
-        }
-        
-        continuation = nil
     }
 }

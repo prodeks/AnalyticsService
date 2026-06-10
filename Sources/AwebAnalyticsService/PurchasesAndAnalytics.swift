@@ -163,4 +163,9 @@ import StoreKit
     func log(_ e: EventProtocol) {
         analytics.log(e: e)
     }
+
+    /// Logs the onboarding funnel anchor event. Call from the host app when onboarding starts.
+    public func logOnboardingStarted() {
+        analytics.log(e: OnboardingStartedEvent())
+    }
 }

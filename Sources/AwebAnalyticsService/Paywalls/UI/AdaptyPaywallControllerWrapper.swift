@@ -12,21 +12,25 @@ class AdaptyPaywallControllerWrapper: UIViewController, PaywallControllerProtoco
     let analyticsService: AnalyticsService
     let placement: String
     let proxy: AdaptyPaywallControllerDelegateProxy
-    
+    private let presentationContext: PaywallPresentationContext
+    private var didLogOpen = false
+
     init(
         wrappedController: AdaptyPaywallController,
         purchaseService: PurchaseService,
         analyticsService: AnalyticsService,
         placement: String,
-        proxy: AdaptyPaywallControllerDelegateProxy
+        proxy: AdaptyPaywallControllerDelegateProxy,
+        presentationContext: PaywallPresentationContext
     ) {
         self.analyticsService = analyticsService
         self.wrappedController = wrappedController
         self.purchaseService = purchaseService
         self.placement = placement
         self.proxy = proxy
+        self.presentationContext = presentationContext
         super.init(nibName: nil, bundle: nil)
-        
+
         proxy.forwarding = self
     }
     
@@ -42,6 +46,22 @@ class AdaptyPaywallControllerWrapper: UIViewController, PaywallControllerProtoco
         view.addSubview(wrappedController.view)
         wrappedController.view.frame = view.bounds
         wrappedController.didMove(toParent: self)
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        guard !didLogOpen else { return }
+        didLogOpen = true
+        analyticsService.log(e: PaywallOpenEvent(context: presentationContext))
+    }
+
+    private func dismissPaywall(purchasedProductID: String?) {
+        analyticsService.log(e: PaywallClosedEvent(
+            context: presentationContext,
+            purchased: purchasedProductID != nil
+        ))
+        dismissed?(purchasedProductID)
     }
 }
 
@@ -113,27 +133,11 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
 }
 
 extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
-    enum Events {
-        enum Tap: EventProtocol {
-            case startPurchase
-            
-            var name: String {
-                switch self {
-                case .startPurchase:
-                    return "Paywall_Start_Button_tap"
-                }
-            }
-            
-            var params: [String : Any] {
-                return [:]
-            }
-        }
-    }
-    
+
     public func paywallController(_ controller: AdaptyPaywallController, didPerform action: AdaptyUI.Action) {
         switch action {
         case .close:
-            dismissed?(nil)
+            dismissPaywall(purchasedProductID: nil)
         case .openURL(let url):
             Log.printLog(l: .debug, str: "didPerform action with URL - \(url)")
             presentPolicyItem(url)
@@ -154,7 +158,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         didStartPurchase product: AdaptyPaywallProduct
     ) {
         Log.printLog(l: .debug, str: #function)
-        analyticsService.log(e: AdaptyPaywallControllerWrapper.Events.Tap.startPurchase)
+        PaywallEventLogger.checkoutStarted(
+            checkoutContext(product: product),
+            log: analyticsService.log(e:)
+        )
     }
   
     func paywallController(
@@ -163,7 +170,13 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         purchaseResult: AdaptyPurchaseResult
     ) {
         purchaseService.subscriptionStatus = purchaseResult.isPurchaseSuccess ? .active : .inactive
-        dismissed?(product.vendorProductId)
+        let context = checkoutContext(product: product)
+        if purchaseResult.isPurchaseSuccess {
+            PaywallEventLogger.purchaseSucceeded(context, log: analyticsService.log(e:))
+        } else if purchaseResult.isPurchaseCancelled {
+            PaywallEventLogger.purchaseCancelled(context, log: analyticsService.log(e:))
+        }
+        dismissPaywall(purchasedProductID: product.vendorProductId)
     }
     
     public func paywallController(
@@ -171,7 +184,13 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         didFailPurchase product: AdaptyPaywallProduct,
         error: AdaptyError
     ) {
-        logPurchaseFailed(productID: product.vendorProductId, metadata: PaywallFailureMetadata(error: error))
+        let metadata = PaywallFailureMetadata(error: error)
+        PaywallEventLogger.purchaseFailed(
+            checkoutContext(product: product),
+            adaptyError: error,
+            reason: metadata.reason,
+            log: analyticsService.log(e:)
+        )
         presentCannotPurchaseAlert()
     }
     
@@ -179,7 +198,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         _ controller: AdaptyPaywallController,
         didCancelPurchase product: AdaptyPaywallProduct
     ) {
-        logPurchaseFailed(productID: product.vendorProductId, metadata: .cancelled)
+        PaywallEventLogger.purchaseCancelled(
+            checkoutContext(product: product),
+            log: analyticsService.log(e:)
+        )
     }
     
     public func paywallControllerDidStartRestore(
@@ -192,7 +214,8 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         if let subscriptionStatus = profile.accessLevels["premium"]?.subscriptionStatus {
             purchaseService.subscriptionStatus = subscriptionStatus
             if subscriptionStatus.isSubActive {
-                dismissed?(nil)
+                PaywallEventLogger.restoreSucceeded(source: .adapty, log: analyticsService.log(e:))
+                dismissPaywall(purchasedProductID: nil)
             } else {
                 presentNoPurchasesToRestoreAlert()
             }
@@ -212,7 +235,7 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         didFailRenderingWith error: AdaptyUIError
     ) {
         logPaywallFailed(metadata: AnalyticsErrorMetadata(error: error))
-        dismissed?(nil)
+        dismissPaywall(purchasedProductID: nil)
     }
     
     public func paywallController(
@@ -250,33 +273,32 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         present(n, animated: true)
     }
     
-    private func logPurchaseFailed(productID: String, metadata: PaywallFailureMetadata) {
-        analyticsService.log(
-            e: PurchaseFailedEvent(
-                reason: metadata.reason,
-                productID: productID,
-                placement: placement,
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
-            )
+    private func checkoutContext(product: any AdaptyPaywallProduct) -> PaywallCheckoutContext {
+        PaywallCheckoutContext(
+            paywallID: presentationContext.paywallID,
+            placement: placement,
+            product: AdaptyProductContext(product: product),
+            variationId: presentationContext.variationId,
+            presentationID: presentationContext.presentationID,
+            source: .adapty
         )
     }
     
     private func logRestoreFailed(metadata: PaywallFailureMetadata) {
-        analyticsService.log(
-            e: RestoreFailedEvent(
-                reason: metadata.reason,
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
-            )
+        PaywallEventLogger.restoreFailed(
+            reason: metadata.reason,
+            source: .adapty,
+            errorDomain: metadata.errorDomain,
+            errorCode: metadata.errorCode,
+            log: analyticsService.log(e:)
         )
     }
     
     private func logPricesFailed(metadata: AnalyticsErrorMetadata) {
         analyticsService.log(
             e: PricesFailedEvent(
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
+                source: .adapty,
+                metadata: metadata
             )
         )
     }
@@ -284,9 +306,9 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     private func logPaywallFailed(metadata: AnalyticsErrorMetadata) {
         analyticsService.log(
             e: PaywallFailedEvent(
+                source: .adapty,
                 placement: placement,
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
+                metadata: metadata
             )
         )
     }

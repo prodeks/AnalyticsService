@@ -9,19 +9,27 @@ final class DirectStoreKitPaywallController: UIViewController, PaywallViewDelega
     private let overlayView = LoaderOverlayView()
     private let purchaseService: PurchaseServiceProtocol
     private let paywallView: any PaywallViewProtocol
-    private let productsByIdentifier: [String: SKProduct]
+    private let productsByIdentifier: [String: StoreKit.Product]
     
     public var paywallScreenID: String? { paywallView.paywallID.rawValue }
-    
+
+    private var presentationContext: PaywallPresentationContext?
+    private var logEvent: ((EventProtocol) -> Void)?
+    private var didLogOpen = false
+
     init(
         purchaseService: PurchaseServiceProtocol,
         paywallView: any PaywallViewProtocol,
-        productsByIdentifier: [String: SKProduct]
+        productsByIdentifier: [String: StoreKit.Product],
+        presentationContext: PaywallPresentationContext,
+        logEvent: @escaping (EventProtocol) -> Void
     ) {
         self.purchaseService = purchaseService
         self.paywallView = paywallView
         self.productsByIdentifier = productsByIdentifier
-        
+        self.presentationContext = presentationContext
+        self.logEvent = logEvent
+
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -44,7 +52,15 @@ final class DirectStoreKitPaywallController: UIViewController, PaywallViewDelega
             navigationController.setNavigationBarHidden(true, animated: false)
         }
     }
-    
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        guard !didLogOpen, let presentationContext else { return }
+        didLogOpen = true
+        logEvent?(PaywallOpenEvent(context: presentationContext))
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
@@ -63,13 +79,14 @@ final class DirectStoreKitPaywallController: UIViewController, PaywallViewDelega
         guard let product = productsByIdentifier[iap.productID] else {
             return nil
         }
+        let introductoryOffer = product.subscription?.introductoryOffer
         
         return PricingData(
-            value: Double(truncating: product.price),
-            priceLocale: product.priceLocale,
-            currencySymbol: product.priceLocale.currencySymbol ?? "",
-            introOfferValue: product.introductoryPrice.map { Double(truncating: $0.price) },
-            introOfferLocalizedPrice: localizedPrice(for: product.introductoryPrice, locale: product.priceLocale),
+            value: Double(truncating: product.price as NSDecimalNumber),
+            priceLocale: product.priceFormatStyle.locale,
+            currencySymbol: product.priceFormatStyle.locale.currencySymbol ?? "",
+            introOfferValue: introductoryOffer.map { Double(truncating: $0.price as NSDecimalNumber) },
+            introOfferLocalizedPrice: introductoryOffer?.displayPrice,
             iap: iap
         )
     }
@@ -88,8 +105,13 @@ final class DirectStoreKitPaywallController: UIViewController, PaywallViewDelega
     
     func purchase(_ iap: any IAPProtocol) {
         overlayView.isHidden = false
-        if let product = productsByIdentifier[iap.productID] {
-            purchaseService.purchaseProduct(product) { [weak self] result in
+        if let product = productsByIdentifier[iap.productID], let presentationContext {
+            purchaseService.purchaseProduct(
+                product,
+                paywallID: presentationContext.paywallID,
+                placement: presentationContext.placement,
+                presentationID: presentationContext.presentationID
+            ) { [weak self] result in
                 guard let self else { return }
                 self.overlayView.isHidden = true
                 
@@ -125,6 +147,13 @@ final class DirectStoreKitPaywallController: UIViewController, PaywallViewDelega
     }
     
     private func dismiss(_ purchasedProductID: String?) {
+        if let presentationContext {
+            logEvent?(PaywallClosedEvent(
+                context: presentationContext,
+                purchased: purchasedProductID != nil
+            ))
+        }
+
         if let presented = presentedViewController {
             presented.dismiss(animated: true) {
                 self.dismissed?(purchasedProductID)
@@ -132,15 +161,6 @@ final class DirectStoreKitPaywallController: UIViewController, PaywallViewDelega
         } else {
             dismissed?(purchasedProductID)
         }
-    }
-    
-    private func localizedPrice(for discount: SKProductDiscount?, locale: Locale) -> String? {
-        guard let discount else {
-            return nil
-        }
-        
-        SKProduct.formatter.locale = locale
-        return SKProduct.formatter.string(from: discount.price)
     }
     
     private func presentNoPurchasesToRestoreAlert() {

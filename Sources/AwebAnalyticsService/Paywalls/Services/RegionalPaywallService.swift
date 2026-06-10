@@ -63,7 +63,7 @@ final class RegionalPaywallService: PaywallServiceProtocol {
 
     // MARK: - Private properties
 
-    private let adaptyPaywallService: PaywallService
+    private let adaptyPaywallService: AdaptyPaywallService
     private let directStoreKitPaywallService: DirectStoreKitPaywallService
     private let purchaseService: PurchaseService
 
@@ -75,7 +75,7 @@ final class RegionalPaywallService: PaywallServiceProtocol {
 
     init(purchaseService: PurchaseService, analyticsService: AnalyticsService) {
         self.purchaseService = purchaseService
-        self.adaptyPaywallService = PaywallService(
+        self.adaptyPaywallService = AdaptyPaywallService(
             purchaseService: purchaseService,
             analyticsService: analyticsService
         )

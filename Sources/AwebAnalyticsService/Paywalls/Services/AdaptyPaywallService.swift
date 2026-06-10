@@ -52,7 +52,7 @@ struct CustomPaywallData {
 
 public typealias PaywallIdentifier = String
 
-class PaywallService: PaywallServiceProtocol {
+class AdaptyPaywallService: PaywallServiceProtocol {
     
     public var placements = Set<String>()
     
@@ -80,11 +80,22 @@ class PaywallService: PaywallServiceProtocol {
             switch paywallData {
             case .customPaywall(let customPaywallData):
                 if let view = uiFactory?(customPaywallData.adaptyPaywall.name) {
-                    return PaywallController(
+                    let context = PaywallPresentationContext(
+                        paywallID: view.paywallID.rawValue,
+                        placement: customPaywallData.placement,
+                        variationId: customPaywallData.adaptyPaywall.variationId,
+                        source: .adapty
+                    )
+                    let controller = PaywallController(
                         purchaseService: purchaseService,
                         paywallView: view,
                         adaptyPaywallData: customPaywallData
                     )
+                    controller.configureAnalytics(
+                        context: context,
+                        logEvent: analyticsService.log(e:)
+                    )
+                    return controller
                 } else {
                     logPaywallFailed(
                         placement: placement.identifier,
@@ -94,6 +105,12 @@ class PaywallService: PaywallServiceProtocol {
                 }
             case .adaptyBuilder(let adaptyBuilderData):
                 do {
+                    let context = PaywallPresentationContext(
+                        paywallID: adaptyBuilderData.adaptyPaywall.name,
+                        placement: adaptyBuilderData.placement,
+                        variationId: adaptyBuilderData.adaptyPaywall.variationId,
+                        source: .adapty
+                    )
                     let proxy = AdaptyPaywallControllerDelegateProxy()
                     let adaptyController = try AdaptyUI.paywallController(
                         with: adaptyBuilderData.configuration,
@@ -104,7 +121,8 @@ class PaywallService: PaywallServiceProtocol {
                         purchaseService: purchaseService,
                         analyticsService: analyticsService,
                         placement: adaptyBuilderData.placement,
-                        proxy: proxy
+                        proxy: proxy,
+                        presentationContext: context
                     )
                 } catch {
                     Log.printLog(l: .error, str: "Failed to create Adapty paywall controller: \(error)")
@@ -158,8 +176,9 @@ class PaywallService: PaywallServiceProtocol {
                 } catch {
                     self.analyticsService.log(
                         e: PaywallFetchErrorEvent(
+                            source: .adapty,
                             placement: identifier,
-                            errorDescription: error.localizedDescription
+                            error: error
                         )
                     )
                     return nil
@@ -173,8 +192,8 @@ class PaywallService: PaywallServiceProtocol {
     private func logPricesFailed(metadata: AnalyticsErrorMetadata) {
         analyticsService.log(
             e: PricesFailedEvent(
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
+                source: .adapty,
+                metadata: metadata
             )
         )
     }
@@ -182,9 +201,9 @@ class PaywallService: PaywallServiceProtocol {
     private func logPaywallFailed(placement: String, metadata: AnalyticsErrorMetadata) {
         analyticsService.log(
             e: PaywallFailedEvent(
+                source: .adapty,
                 placement: placement,
-                errorDomain: metadata.errorDomain,
-                errorCode: metadata.errorCode
+                metadata: metadata
             )
         )
     }

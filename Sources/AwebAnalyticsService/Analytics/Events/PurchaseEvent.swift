@@ -4,6 +4,56 @@ import FacebookCore
 import StoreKit
 import Adapty
 
+/// Source-agnostic failure payload for `PurchaseEvent.fail`.
+struct PurchaseFailurePayload {
+    let productID: String
+    let errorDomain: String
+    let errorCode: Int
+    let errorDescription: String
+    let value: String
+
+    init(adaptyError error: AdaptyError, productID: String) {
+        self.productID = productID
+        self.errorDomain = (error as NSError).domain
+        self.errorCode = error.errorCode
+        self.errorDescription = error.localizedDescription
+
+        var value = ""
+        value.append("code: \(error.errorCode)\n")
+        error.errorUserInfo.forEach { key, valueItem in
+            value.append("\(key): \(valueItem)\n")
+        }
+        self.value = value
+    }
+
+    init(
+        productID: String,
+        errorDomain: String,
+        errorCode: Int,
+        description: String
+    ) {
+        self.productID = productID
+        self.errorDomain = errorDomain
+        self.errorCode = errorCode
+        self.errorDescription = description
+        self.value = "code: \(errorCode)\n\(errorDomain): \(description)\n"
+    }
+
+    init(
+        productID: String,
+        errorDomain: String,
+        errorCode: Int,
+        description: String,
+        value: String?
+    ) {
+        self.productID = productID
+        self.errorDomain = errorDomain
+        self.errorCode = errorCode
+        self.errorDescription = description
+        self.value = value ?? "code: \(errorCode)\n\(errorDomain): \(description)\n"
+    }
+}
+
 /// Represents the four possible outcomes of an in-app purchase attempt.
 ///
 /// These events are logged to every analytics backend via `AnalyticsService.log(e:)`.
@@ -21,61 +71,64 @@ enum PurchaseEvent: EventProtocol {
 
     /// The purchase completed successfully.
     ///
-    /// - Parameter iap: A tuple of `(productID, price)` in USD. The price is used by
-    ///   `AnalyticsService` to log revenue to Facebook.
-    case success(iap: (String, Float))
+    /// - Parameter iap: A tuple of `(productID, price, currency)`. The price and currency
+    ///   are used by `AnalyticsService` to log revenue to Facebook.
+    case success(source: PaywallSource, iap: (String, Float, String))
 
     /// The user cancelled the purchase dialog before payment was authorised.
     ///
-    /// - Parameter iap: A tuple of `(productID, price)`. Price is preserved so
-    ///   cancelled checkout funnels can be valued the same way as completions.
-    case cancel(iap: (String, Float))
+    /// - Parameter iap: A tuple of `(productID, price, currency)`. Price and currency are
+    ///   preserved so cancelled checkout funnels can be valued the same way as completions.
+    case cancel(source: PaywallSource, iap: (String, Float, String))
 
     /// The purchase failed due to an Adapty or StoreKit error.
     ///
-    /// - Parameter iap: A tuple of `(productID, AdaptyError)`. The error is serialised
-    ///   into a multiline string containing the error code and all `userInfo` entries.
-    case fail(iap: (String, AdaptyError))
+    /// The payload keeps the legacy string value while also exposing structured error
+    /// fields that work across Adapty and StoreKit.
+    case fail(source: PaywallSource, PurchaseFailurePayload)
 
     /// A restore-purchases operation completed.
     ///
     /// No product-level payload is attached because a restore may affect multiple
     /// products simultaneously and the authoritative state is derived from the profile
     /// returned by `Adapty.restorePurchases()`.
-    case restore
+    case restore(source: PaywallSource)
 
     // MARK: - EventProtocol
 
     var name: String {
         switch self {
-        case .cancel: return "sale_confirmation_cancel"
-        case .success: return "sale_confirmation_success"
-        case .fail: return "sale_confirmation_fail"
-        case .restore: return "sale_confirmation_restore"
+        case .cancel(let source, _): return "\(source.eventPrefix)sale_confirmation_cancel"
+        case .success(let source, _): return "\(source.eventPrefix)sale_confirmation_success"
+        case .fail(let source, _): return "\(source.eventPrefix)sale_confirmation_fail"
+        case .restore(let source): return "\(source.eventPrefix)sale_confirmation_restore"
         }
     }
 
     var params: [String: Any] {
         switch self {
-        case .success(let iap):
-            return ["product_id": iap.0, AnalyticsParameterValue: iap.1]
+        case .success(_, let iap):
+            return [
+                "product_id": iap.0,
+                AnalyticsParameterValue: iap.1,
+                "currency": iap.2
+            ]
 
-        case .cancel(let iap):
-            return ["product_id": iap.0, AnalyticsParameterValue: iap.1]
+        case .cancel(_, let iap):
+            return [
+                "product_id": iap.0,
+                AnalyticsParameterValue: iap.1,
+                "currency": iap.2
+            ]
 
-        case .fail(let iap):
-            // Serialise the full error user-info into a single string value so that
-            // backends that don't support nested objects (e.g. Firebase) still capture
-            // all diagnostic detail.
-            return ["product_id": iap.0, AnalyticsParameterValue: {
-                let error = iap.1
-                var str = ""
-                str.append("code: \(error.errorCode)\n")
-                error.errorUserInfo.forEach { k, v in
-                    str.append("\(k): \(v)\n")
-                }
-                return str
-            }()]
+        case .fail(_, let payload):
+            return [
+                "product_id": payload.productID,
+                AnalyticsParameterValue: payload.value,
+                "errorDomain": payload.errorDomain,
+                "errorCode": payload.errorCode,
+                "error_description": payload.errorDescription
+            ]
 
         case .restore:
             return [:]

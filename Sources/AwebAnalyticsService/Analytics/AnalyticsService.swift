@@ -568,10 +568,10 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         AppEvents.shared.logEvent(AppEvents.Name(e.name), parameters: fbParams)
 
         if let purchaseEvent = e as? PurchaseEvent,
-            case let .success(iap) = purchaseEvent {
+            case let .success(_, iap) = purchaseEvent {
             AppEvents.shared.logPurchase(
                 amount: Double(iap.1),
-                currency: "USD"
+                currency: iap.2
             )
         }
 

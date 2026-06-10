@@ -8,9 +8,11 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     public var dismissed: ((_ purchasedProductID: String?) -> Void)?
     public var navigated: ((PaywallPlacementProtocol) -> Void)?
     public var paywallScreenID: String? { paywallView.paywallID.rawValue }
-    public var logOpen: (() -> Void)?
-    public var logClose: (() -> Void)?
-    
+
+    private var presentationContext: PaywallPresentationContext?
+    private var logEvent: ((EventProtocol) -> Void)?
+    private var didLogOpen = false
+
     let overlayView = LoaderOverlayView()
     let purchaseService: PurchaseService
     let adaptyPaywallData: CustomPaywallData
@@ -49,7 +51,23 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
         
         Adapty.logShowPaywall(adaptyPaywallData.adaptyPaywall)
     }
-    
+
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        guard !didLogOpen, let presentationContext else { return }
+        didLogOpen = true
+        logEvent?(PaywallOpenEvent(context: presentationContext))
+    }
+
+    func configureAnalytics(
+        context: PaywallPresentationContext,
+        logEvent: @escaping (EventProtocol) -> Void
+    ) {
+        self.presentationContext = context
+        self.logEvent = logEvent
+    }
+
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
@@ -81,7 +99,7 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     
     public func restore() {
         overlayView.isHidden = false
-        purchaseService.restore { [weak self] restored in
+        purchaseService.restore(source: .adapty) { [weak self] restored in
             self?.overlayView.isHidden = true
             if restored {
                 self?.dismiss()
@@ -97,7 +115,9 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
             purchaseService.purchaseAdaptyProduct(
                 product,
                 paywallID: paywallView.paywallID.rawValue,
-                placement: adaptyPaywallData.placement
+                placement: adaptyPaywallData.placement,
+                presentationID: presentationContext?.presentationID,
+                variationId: presentationContext?.variationId
             ) { [weak self] result in
                 guard let self = self else { return }
                 self.overlayView.isHidden = true
@@ -108,7 +128,6 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
                 case .fail:
                     self.presentCannotPurchaseAlert()
                 case .success:
-                    self.logClose?()
                     self.dismiss(iap.productID)
                 }
             }
@@ -119,6 +138,13 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     }
     
     private func dismiss(_ purchasedProductID: String?) {
+        if let presentationContext {
+            logEvent?(PaywallClosedEvent(
+                context: presentationContext,
+                purchased: purchasedProductID != nil
+            ))
+        }
+
         if let presented = presentedViewController {
             presented.dismiss(animated: true) {
                 self.dismissed?(purchasedProductID)
@@ -141,7 +167,6 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     }
     
     public func dismiss() {
-        logClose?()
         dismiss(nil)
     }
     
