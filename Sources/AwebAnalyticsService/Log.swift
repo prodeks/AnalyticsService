@@ -1,6 +1,7 @@
 import Foundation
 import os
 import Sentry
+import Adapty
 
 enum Log {
     
@@ -30,7 +31,7 @@ enum Log {
     
     static func printLog(l: Level, str: String) {
         let message = "\(l.prefix)\(str)"
-        print(message)
+        NSLog(message)
         logger.notice("\(message, privacy: .public)")
         
         let breadcrumb = Breadcrumb(level: l.sentryLevel, category: "log")
@@ -39,6 +40,18 @@ enum Log {
         
         if l == .error {
             SentrySDK.capture(message: message)
+        }
+    }
+}
+
+extension Log.Level {
+    init(_ adaptyType: AdaptyLog.Level) {
+        switch adaptyType {
+        case .debug: self = .debug
+        case .error: self = .error
+        case .verbose: self = .debug
+        case .warn: self = .debug
+        case .info: self = .debug
         }
     }
 }

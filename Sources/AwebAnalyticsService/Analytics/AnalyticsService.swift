@@ -258,7 +258,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
              options.sessionReplay.sessionSampleRate = 0.1
 #if DEBUG
             options.environment = "debug"
-            options.debug = true
+//            options.debug = true
 #else
             options.environment = "production"
 #endif
@@ -302,6 +302,10 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 try await adaptyUI.activate()
 
                 try await adapty.updateCollectingRefundDataConsent(true)
+                
+                Adapty.setLogHandler { record in
+                    Log.printLog(l: .init(record.level), str: record.message)
+                }
 
                 // Register cross-SDK identifiers so Adapty can join events from
                 // Firebase, Mixpanel, and Facebook in its analytics pipelines.
