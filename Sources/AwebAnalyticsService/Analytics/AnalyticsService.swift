@@ -304,7 +304,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 try await adapty.updateCollectingRefundDataConsent(true)
                 
                 Adapty.setLogHandler { record in
-                    Log.printLog(l: .init(record.level), str: record.message)
+                    Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
                 }
 
                 // Register cross-SDK identifiers so Adapty can join events from
