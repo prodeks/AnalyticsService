@@ -30,7 +30,7 @@ enum Log {
     }
     
     static func printLog(l: Level, str: String) {
-        let message = "\(l.prefix)\(str)"
+        let message = "-->\(l.prefix)\(str)"
         NSLog(message)
         logger.notice("\(message, privacy: .public)")
         

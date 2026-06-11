@@ -40,16 +40,6 @@ public protocol PurchaseServiceProtocol: AnyObject {
         _ completion: @escaping (PurchaseResult) -> Void
     )
 
-    /// Initiates a purchase through StoreKit.
-    ///
-    /// - Parameters:
-    ///   - product: The StoreKit `Product` to purchase.
-    ///   - completion: Called on the main thread with the purchase outcome.
-    func purchaseProduct(
-        _ product: StoreKit.Product,
-        _ completion: @escaping (PurchaseResult) -> Void
-    )
-
     /// Initiates a StoreKit purchase from a paywall, logging checkout analytics.
     ///
     /// - Parameters:

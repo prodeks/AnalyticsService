@@ -43,7 +43,7 @@ struct StoreKitPurchaser {
     /// Verified transactions are forwarded for entitlement processing. Unverified
     /// transactions and pending states are treated as failures; user cancellation is
     /// surfaced as `.cancel`.
-    private func purchase(_ product: StoreKit.Product) async -> StoreKitPurchaseOutcome {
+    func purchase(_ product: StoreKit.Product) async -> StoreKitPurchaseOutcome {
         do {
             let result = try await product.purchase()
 

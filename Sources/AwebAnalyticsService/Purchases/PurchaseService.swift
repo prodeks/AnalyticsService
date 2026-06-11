@@ -137,20 +137,6 @@ class PurchaseService: PurchaseServiceProtocol {
         }
     }
 
-    /// Purchases a product via StoreKit (used in StoreKit mode / China region).
-    public func purchaseProduct(
-        _ product: StoreKit.Product,
-        _ completion: @escaping (PurchaseResult) -> Void
-    ) {
-        purchaseProduct(
-            product,
-            paywallID: product.id,
-            placement: product.id,
-            presentationID: nil,
-            completion
-        )
-    }
-
     public func purchaseProduct(
         _ product: StoreKit.Product,
         paywallID: String,
@@ -188,11 +174,10 @@ class PurchaseService: PurchaseServiceProtocol {
             return
         }
 
-        let productIdentifier = product.id
         Task { [weak self] in
             guard let self else { return }
 
-            let outcome = await self.storeKitPurchaser.purchaseProduct(with: productIdentifier)
+            let outcome = await self.storeKitPurchaser.purchase(product)
             await MainActor.run {
                 if let logEvent = self.logEvent {
                     self.logStoreKitOutcome(outcome, context: checkoutContext, log: logEvent)
