@@ -3,11 +3,11 @@ import os
 import Sentry
 import Adapty
 
-enum Log {
+public enum Log {
     
     private static var logger = Logger(subsystem: "AnalyticsPackage", category: "")
     
-    enum Level {
+    public enum Level {
         case debug
         case analytics
         case error
@@ -29,9 +29,9 @@ enum Log {
         }
     }
     
-    static func printLog(l: Level, str: String) {
+    public static func printLog(l: Level, str: String) {
         let message = "-->\(l.prefix)\(str)"
-        NSLog(message)
+        
         logger.notice("\(message, privacy: .public)")
         
         let breadcrumb = Breadcrumb(level: l.sentryLevel, category: "log")
