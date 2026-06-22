@@ -288,6 +288,8 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             _userID = userID
             appsflyer.customerUserID = userID
             SentrySDK.setUser(.init(userId: userID))
+            Mixpanel.mainInstance().identify(distinctId: userID)
+            Mixpanel.mainInstance().people.set(property: "firebase_uid", to: userID)
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                 let configuration = AdaptyConfiguration
                     .builder(withAPIKey: key)
