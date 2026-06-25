@@ -296,9 +296,8 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     .with(logLevel: .verbose)
                     .with(customerUserId: userID)
                     .with(serverCluster: await adaptyServerClusterForCurrentUser())
-                    // observerMode: true in China so Adapty does not intercept
-                    // StoreKit transactions — the app manages purchases directly.
-                    .with(observerMode: isRunningInChina)
+                    .with(ipAddressCollectionDisabled: isRunningInChina)
+                    .with(observerMode: false)
                     .build()
                 try await adapty.activate(with: configuration)
                 try await adaptyUI.activate()

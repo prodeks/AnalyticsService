@@ -40,22 +40,6 @@ public protocol PurchaseServiceProtocol: AnyObject {
         _ completion: @escaping (PurchaseResult) -> Void
     )
 
-    /// Initiates a StoreKit purchase from a paywall, logging checkout analytics.
-    ///
-    /// - Parameters:
-    ///   - product: The StoreKit `Product` to purchase.
-    ///   - paywallID: Identifier of the originating paywall.
-    ///   - placement: The placement from which the purchase was initiated.
-    ///   - presentationID: Correlates checkout events with a single paywall presentation.
-    ///   - completion: Called on the main thread with the purchase outcome.
-    func purchaseProduct(
-        _ product: StoreKit.Product,
-        paywallID: String,
-        placement: String,
-        presentationID: String?,
-        _ completion: @escaping (PurchaseResult) -> Void
-    )
-
     /// Restores previously completed transactions and updates the subscription status.
     ///
     /// - Parameter completion: Called on the main thread with `true` if an active

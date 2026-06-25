@@ -65,26 +65,23 @@ import StoreKit
     lazy var _purchases = PurchaseService()
 
     /// Region-aware paywall facade backed by Adapty or `DirectStoreKitPaywallService`.
-    lazy var _paywalls = RegionalPaywallService(
-        purchaseService: _purchases,
-        analyticsService: _analytics
-    )
+    lazy var _paywalls = AdaptyPaywallService(purchaseService: _purchases, analyticsService: _analytics)
 
     lazy var _remoteConfig = RemoteConfigService.shared
 
     // MARK: - Paywall configuration
 
-    /// Maps placement identifiers to the `PaywallIdentifier` used by the direct
-    /// StoreKit paywall path (China / Ukraine).
-    ///
-    /// Assign before or after accessing `paywalls`; changes are forwarded to
-    /// `RegionalPaywallService` via `didSet`. Ignored by the Adapty backend, which
-    /// resolves view identifiers from remote configuration.
-    public var viewIdentifiersByPlacement: [String: PaywallIdentifier] = [:] {
-        didSet {
-            _paywalls.viewIdentifiersByPlacement = viewIdentifiersByPlacement
-        }
-    }
+//    /// Maps placement identifiers to the `PaywallIdentifier` used by the direct
+//    /// StoreKit paywall path (China / Ukraine).
+//    ///
+//    /// Assign before or after accessing `paywalls`; changes are forwarded to
+//    /// `RegionalPaywallService` via `didSet`. Ignored by the Adapty backend, which
+//    /// resolves view identifiers from remote configuration.
+//    public var viewIdentifiersByPlacement: [String: PaywallIdentifier] = [:] {
+//        didSet {
+//            _paywalls.viewIdentifiersByPlacement = viewIdentifiersByPlacement
+//        }
+//    }
 
     // MARK: - Startup callback
 
@@ -118,7 +115,6 @@ import StoreKit
         _analytics.analyticsStarted = { options in
             Task {
                 let isRunningInChina = await self.isRunningInChina()
-                self._paywalls.configure(isRunningInChina: isRunningInChina)
                 self._analytics.isRunningInChina = isRunningInChina
                 await self._analytics.firebaseSignIn(options)
 
@@ -151,7 +147,8 @@ import StoreKit
         let storefront = await Storefront.current?.countryCode
         let locale = Locale.current.region?.identifier
 
-        return storefront == "CHN" || locale == "CN"
+        let result = storefront == "CHN" || locale == "CN"
+        return result
     }
 
     // MARK: - Event bridge
