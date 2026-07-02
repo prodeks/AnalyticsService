@@ -195,6 +195,8 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
     /// Guards against running the SDK setup block more than once.
     private var didSetupAnalytics = false
+    
+    private var didSetupMixPanel = false
 
     // MARK: - App lifecycle
 
@@ -221,13 +223,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             FirebaseApp.configure()
 
             // Mixpanel — EU endpoint used for GDPR compliance.
-            Mixpanel.initialize(
-                token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "",
-                trackAutomaticEvents: false,
-                serverURL: "https://api-eu.mixpanel.com"
-            )
-            Mixpanel.mainInstance().loggingEnabled = true
-
+            setupMixPanelIfNeeded()
             Messaging.messaging().delegate = self
             didSetupAnalytics = true
         }
@@ -274,6 +270,23 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
     // MARK: - Firebase sign-in & Adapty activation
 
+    fileprivate func mixPanelIdentifyUser(_ userID: String) {
+        Mixpanel.mainInstance().identify(distinctId: userID)
+        Mixpanel.mainInstance().people.set(property: "firebase_uid", to: userID)
+    }
+    
+    fileprivate func setupMixPanelIfNeeded() {
+        if !didSetupMixPanel {
+            Mixpanel.initialize(
+                token: PurchasesAndAnalytics.Keys.mixPanelToken ?? "",
+                trackAutomaticEvents: false,
+                serverURL: "https://api-eu.mixpanel.com"
+            )
+            Mixpanel.mainInstance().loggingEnabled = true
+            didSetupMixPanel = true
+        }
+    }
+    
     /// Signs in anonymously with Firebase, then activates Adapty and registers
     /// cross-SDK user identifiers so attribution data can be joined server-side.
     ///
@@ -288,8 +301,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             _userID = userID
             appsflyer.customerUserID = userID
             SentrySDK.setUser(.init(userId: userID))
-            Mixpanel.mainInstance().identify(distinctId: userID)
-            Mixpanel.mainInstance().people.set(property: "firebase_uid", to: userID)
+            mixPanelIdentifyUser(userID)
             if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
                 let configuration = AdaptyConfiguration
                     .builder(withAPIKey: key)
@@ -444,8 +456,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     // MARK: - Notifications
 
     public func registerForNotifications() {
-        UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (granted, error) in
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (_, _) in
             // handle if needed
         }
         UIApplication.shared.registerForRemoteNotifications()
@@ -560,7 +571,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     /// - Mixpanel: all values are coerced to `String` via `String(describing:)` because
     ///   Mixpanel's Swift API requires `[String: MixpanelType]`.
     public func log(e: EventProtocol) {
-
+        setupMixPanelIfNeeded()
         Log.printLog(l: .analytics, str: e.name + " \(e.params)")
 
         firebase.logEvent(e.name, parameters: e.params)
