@@ -15,10 +15,10 @@ public enum PaywallSource {
     case adapty
     case storeKit
 
-    var eventPrefix: String {
+    var analyticsValue: String {
         switch self {
-        case .adapty: return "adapty_"
-        case .storeKit: return "storekit_"
+        case .adapty: return "adapty"
+        case .storeKit: return "storekit"
         }
     }
 }
@@ -58,12 +58,15 @@ public class PaywallEvent: EventProtocol {
     public var name: String { "" }
 
     public var params: [String: Any] {
-        var result: [String: Any] = ["paywallID": paywallID]
+        var result: [String: Any] = [
+            "paywall_id": paywallID,
+            "purchase_service": source.analyticsValue
+        ]
         if let placement {
-            result["placement"] = placement
+            result["placement_id"] = placement
         }
         if let productID {
-            result["productID"] = productID
+            result["product_id"] = productID
         }
         if let price {
             result["price"] = price
@@ -72,10 +75,10 @@ public class PaywallEvent: EventProtocol {
             result["currency"] = currency
         }
         if let variationId {
-            result["variationId"] = variationId
+            result["variation_id"] = variationId
         }
         if let presentationID {
-            result["presentationID"] = presentationID
+            result["presentation_id"] = presentationID
         }
         return result
     }
@@ -206,8 +209,10 @@ struct PaywallCheckoutContext {
 struct PaywallStartButtonTapEvent: EventProtocol {
     let source: PaywallSource
 
-    var name: String { "\(source.eventPrefix)Paywall_Start_Button_tap" }
-    var params: [String: Any] { [:] }
+    var name: String { "Paywall_Start_Button_tap" }
+    var params: [String: Any] {
+        ["purchase_service": source.analyticsValue]
+    }
 }
 
 /// Emits the canonical paywall purchase funnel event set for every backend.
@@ -368,13 +373,13 @@ enum PaywallEventLogger {
 
 /// Logged when a paywall screen becomes visible to the user.
 ///
-/// The event name embeds the `paywallID` so each paywall's open rate can be tracked
-/// independently without adding a parameter filter in dashboards.
+/// The concrete paywall and purchase engine are exposed through `paywall_id`
+/// and `purchase_service` so dashboards can group one canonical event.
 ///
-/// Event name: `PaywallOpenEvent_<paywallID>`
+/// Event name: `paywall_shown`
 public class PaywallOpenEvent: PaywallEvent {
     public override var name: String {
-        "\(source.eventPrefix)PaywallOpenEvent_\(paywallID)"
+        "paywall_shown"
     }
 }
 
@@ -382,8 +387,12 @@ public class PaywallOpenEvent: PaywallEvent {
 ///
 /// Pair with `PaywallOpenEvent` to compute the paywall's dismiss rate.
 ///
-/// Event name: `PaywallClosedEvent_<paywallID>`
+/// Event name: `paywall_closed`
 public class PaywallClosedEvent: PaywallEvent {
+
+    public override var name: String {
+        "paywall_closed"
+    }
 
     let purchased: Bool
 
@@ -435,7 +444,7 @@ public class PaywallClosedEvent: PaywallEvent {
 /// Event name: `paywall_checkout_initiated`
 public class PaywallCheckoutStartedEvent: PaywallEvent {
     public override var name: String {
-        "\(source.eventPrefix)paywall_checkout_initiated"
+        "paywall_checkout_initiated"
     }
 }
 
@@ -445,7 +454,7 @@ public class PaywallCheckoutStartedEvent: PaywallEvent {
 /// Event name: `paywall_checkout_cancelled`
 public class PaywallCheckoutCancelledEvent: PaywallEvent {
     public override var name: String {
-        "\(source.eventPrefix)paywall_checkout_cancelled"
+        "paywall_checkout_cancelled"
     }
 }
 
@@ -456,10 +465,10 @@ public class PaywallCheckoutCancelledEvent: PaywallEvent {
 /// Includes enough diagnostic context (`reason`, `errorDomain`, `errorCode`) to
 /// triage issues without requiring a crash report.
 ///
-/// Event name: `purchaseFailed`
+/// Event name: `purchase_failed`
 public struct PurchaseFailedEvent: EventProtocol {
 
-    public var name: String { "\(source.eventPrefix)purchaseFailed" }
+    public var name: String { "purchase_failed" }
 
     /// Short failure category key used for dashboard grouping.
     let reason: String
@@ -486,10 +495,11 @@ public struct PurchaseFailedEvent: EventProtocol {
     public var params: [String: Any] {
         var result: [String: Any] = [
             "reason": reason,
-            "productID": productID,
-            "placement": placement,
-            "errorDomain": errorDomain,
-            "errorCode": errorCode
+            "purchase_service": source.analyticsValue,
+            "product_id": productID,
+            "placement_id": placement,
+            "error_domain": errorDomain,
+            "error_code": errorCode
         ]
         if let price {
             result["price"] = price
@@ -498,13 +508,13 @@ public struct PurchaseFailedEvent: EventProtocol {
             result["currency"] = currency
         }
         if let paywallID {
-            result["paywallID"] = paywallID
+            result["paywall_id"] = paywallID
         }
         if let presentationID {
-            result["presentationID"] = presentationID
+            result["presentation_id"] = presentationID
         }
         if let variationId {
-            result["variationId"] = variationId
+            result["variation_id"] = variationId
         }
         return result
     }
@@ -564,10 +574,10 @@ public struct PurchaseFailedEvent: EventProtocol {
 
 /// Logged when `Adapty.restorePurchases()` or `AppStore.sync()` fails.
 ///
-/// Event name: `restoreFailed`
+/// Event name: `restore_failed`
 public struct RestoreFailedEvent: EventProtocol {
 
-    public var name: String { "\(source.eventPrefix)restoreFailed" }
+    public var name: String { "restore_failed" }
 
     /// Short failure category key (`"cancelled"`, `"network_error"`,
     /// `"payment_invalid"`, or `"storekit_sync_failed"`).
@@ -583,8 +593,9 @@ public struct RestoreFailedEvent: EventProtocol {
     public var params: [String: Any] {
         [
             "reason": reason,
-            "errorDomain": errorDomain,
-            "errorCode": errorCode
+            "purchase_service": source.analyticsValue,
+            "error_domain": errorDomain,
+            "error_code": errorCode
         ]
     }
 
@@ -618,10 +629,10 @@ public struct RestoreFailedEvent: EventProtocol {
 /// Typically caused by network issues or an invalid product configuration in App Store
 /// Connect. Dashboards can use `errorCode` to detect App Store outages.
 ///
-/// Event name: `pricesFailed`
+/// Event name: `prices_load_failed`
 public struct PricesFailedEvent: EventProtocol {
 
-    public var name: String { "\(source.eventPrefix)pricesFailed" }
+    public var name: String { "prices_load_failed" }
 
     /// The `NSError.domain` of the underlying StoreKit error.
     let errorDomain: String
@@ -642,12 +653,13 @@ public struct PricesFailedEvent: EventProtocol {
     public var params: [String: Any] {
         var result: [String: Any] = [
             "reason": reason,
-            "error": errorDescription,
-            "errorDomain": errorDomain,
-            "errorCode": errorCode
+            "purchase_service": source.analyticsValue,
+            "error_description": errorDescription,
+            "error_domain": errorDomain,
+            "error_code": errorCode
         ]
         if !failedIdentifiers.isEmpty {
-            result["failedIdentifiers"] = failedIdentifiers
+            result["failed_identifiers"] = failedIdentifiers
         }
         return result
     }
@@ -686,10 +698,10 @@ public struct PricesFailedEvent: EventProtocol {
 /// `DirectStoreKitPaywallService` failures (e.g. products not fetched yet).
 /// The `placement` parameter identifies which entry point failed.
 ///
-/// Event name: `paywallFailed`
+/// Event name: `paywall_show_failed`
 public struct PaywallFailedEvent: EventProtocol {
 
-    public var name: String { "\(source.eventPrefix)paywallFailed" }
+    public var name: String { "paywall_show_failed" }
 
     /// The placement identifier for which the paywall could not be shown.
     let placement: String
@@ -709,11 +721,12 @@ public struct PaywallFailedEvent: EventProtocol {
 
     public var params: [String: Any] {
         [
-            "placement": placement,
+            "placement_id": placement,
             "reason": reason,
-            "error": errorDescription,
-            "errorDomain": errorDomain,
-            "errorCode": errorCode
+            "purchase_service": source.analyticsValue,
+            "error_description": errorDescription,
+            "error_domain": errorDomain,
+            "error_code": errorCode
         ]
     }
 
@@ -914,10 +927,10 @@ enum PaywallAnalyticsError {
 /// Logged when the SDK fails to fetch paywall configuration or products from the
 /// network, providing enough context to diagnose the failing placement.
 ///
-/// Event name: `paywall_fetch_error`
+/// Event name: `paywall_fetch_failed`
 public struct PaywallFetchErrorEvent: EventProtocol {
 
-    public var name: String { "\(source.eventPrefix)paywall_fetch_error" }
+    public var name: String { "paywall_fetch_failed" }
 
     /// The placement for which the fetch was attempted.
     let placement: String
@@ -934,10 +947,11 @@ public struct PaywallFetchErrorEvent: EventProtocol {
 
     public var params: [String: Any] {
         [
-            "placement": placement,
-            "error": errorDescription,
-            "errorDomain": errorDomain,
-            "errorCode": errorCode
+            "placement_id": placement,
+            "purchase_service": source.analyticsValue,
+            "error_description": errorDescription,
+            "error_domain": errorDomain,
+            "error_code": errorCode
         ]
     }
 

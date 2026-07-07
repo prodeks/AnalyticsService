@@ -98,40 +98,45 @@ enum PurchaseEvent: EventProtocol {
 
     var name: String {
         switch self {
-        case .cancel(let source, _): return "\(source.eventPrefix)sale_confirmation_cancel"
-        case .success(let source, _): return "\(source.eventPrefix)sale_confirmation_success"
-        case .fail(let source, _): return "\(source.eventPrefix)sale_confirmation_fail"
-        case .restore(let source): return "\(source.eventPrefix)sale_confirmation_restore"
+        case .cancel: return "sale_confirmation_cancel"
+        case .success: return "sale_confirmation_success"
+        case .fail: return "sale_confirmation_fail"
+        case .restore: return "sale_confirmation_restore"
         }
     }
 
     var params: [String: Any] {
         switch self {
-        case .success(_, let iap):
+        case .success(let source, let iap):
             return [
+                "purchase_service": source.analyticsValue,
                 "product_id": iap.0,
                 AnalyticsParameterValue: iap.1,
                 "currency": iap.2
             ]
 
-        case .cancel(_, let iap):
+        case .cancel(let source, let iap):
             return [
+                "purchase_service": source.analyticsValue,
                 "product_id": iap.0,
                 AnalyticsParameterValue: iap.1,
                 "currency": iap.2
             ]
 
-        case .fail(_, let payload):
+        case .fail(let source, let payload):
             return [
+                "purchase_service": source.analyticsValue,
                 "product_id": payload.productID,
                 AnalyticsParameterValue: payload.value,
-                "errorDomain": payload.errorDomain,
-                "errorCode": payload.errorCode,
+                "error_domain": payload.errorDomain,
+                "error_code": payload.errorCode,
                 "error_description": payload.errorDescription
             ]
 
-        case .restore:
-            return [:]
+        case .restore(let source):
+            return [
+                "purchase_service": source.analyticsValue
+            ]
         }
     }
 }

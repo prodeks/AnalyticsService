@@ -1,13 +1,9 @@
 # Аналитика: покупки и пейволы
 
-
 Все события уходят одновременно в **Firebase, Facebook, AppsFlyer и Mixpanel**.
-У каждого события есть приставка источника покупки:
+Начиная с версии **2.0.7** источник покупки больше не хранится в префиксе события. Вместо `adapty_` / `storekit_` используется параметр `purchase_service` со значением `adapty` или `storekit`.
 
-- `adapty_` — покупки через Adapty (основной вариант)
-- `storekit_` — прямые покупки через App Store (для Китая)
-
-События одного показа пейвола связаны между собой через `presentationID`, поэтому воронку видно целиком.
+События одного показа пейвола связаны между собой через `presentation_id`, поэтому воронку видно целиком.
 
 ---
 
@@ -15,8 +11,8 @@
 
 | Событие | Когда срабатывает |
 |---|---|
-| `PaywallOpenEvent_<id>` | Пользователь увидел экран с подпиской |
-| `PaywallClosedEvent_<id>` | Пользователь закрыл экран (с пометкой, была ли покупка) |
+| `paywall_shown` | Пользователь увидел экран с подпиской |
+| `paywall_closed` | Пользователь закрыл экран (с пометкой, была ли покупка) |
 | `Onboarding_Started` | Начался онбординг (верхняя точка воронки) |
 
 ## Воронка покупки
@@ -54,11 +50,11 @@
 
 | Событие | Когда срабатывает |
 |---|---|
-| `purchaseFailed` | Покупка не прошла (не считая обычной отмены) |
-| `restoreFailed` | Не удалось восстановить покупки |
-| `pricesFailed` | Не загрузились цены из App Store |
-| `paywallFailed` | Пейвол не удалось показать |
-| `paywall_fetch_error` | Не удалось загрузить пейвол из сети |
+| `purchase_failed` | Покупка не прошла (не считая обычной отмены) |
+| `restore_failed` | Не удалось восстановить покупки |
+| `prices_load_failed` | Не загрузились цены из App Store |
+| `paywall_show_failed` | Пейвол не удалось показать |
+| `paywall_fetch_failed` | Не удалось загрузить пейвол из сети |
 
 ---
 
@@ -68,13 +64,14 @@
 
 | Параметр | Описание |
 |---|---|
-| `paywallID` | ID пейвола |
-| `placement` | Площадка/точка, откуда показан пейвол или начата покупка |
-| `productID` / `product_id` | ID товара |
+| `purchase_service` | Источник покупки: `adapty` или `storekit` |
+| `paywall_id` | ID пейвола |
+| `placement_id` | Площадка/точка, откуда показан пейвол или начата покупка |
+| `product_id` | ID товара |
 | `price` / `value` | Цена товара |
 | `currency` | Валюта |
-| `variationId` | ID варианта A/B-теста |
-| `presentationID` | ID конкретного показа (для связи событий) |
+| `variation_id` | ID варианта A/B-теста |
+| `presentation_id` | ID конкретного показа (для связи событий) |
 | `purchased` | Была ли покупка при закрытии экрана (да/нет) |
 
 ### Параметры ошибок
@@ -82,20 +79,20 @@
 | Параметр | Описание |
 |---|---|
 | `reason` | Категория ошибки (см. справочник ниже) |
-| `error` / `error_description` | Текстовое описание ошибки |
-| `errorDomain` | Техническая область ошибки (`AdaptyError`, `SKErrorDomain` и т.д.) |
-| `errorCode` | Числовой код ошибки |
-| `failedIdentifiers` | Список ID товаров, которые не загрузились (для `pricesFailed`) |
+| `error_description` | Текстовое описание ошибки |
+| `error_domain` | Техническая область ошибки (`AdaptyError`, `SKErrorDomain` и т.д.) |
+| `error_code` | Числовой код ошибки |
+| `failed_identifiers` | Список ID товаров, которые не загрузились (для `prices_load_failed`) |
 
 **Какие параметры в каком событии ошибки:**
 
 | Событие | Параметры |
 |---|---|
-| `purchaseFailed` | `reason`, `productID`, `placement`, `errorDomain`, `errorCode`, `price`, `currency`, `paywallID`, `presentationID`, `variationId` |
-| `restoreFailed` | `reason`, `errorDomain`, `errorCode` |
-| `pricesFailed` | `reason`, `error`, `errorDomain`, `errorCode`, `failedIdentifiers` |
-| `paywallFailed` | `placement`, `reason`, `error`, `errorDomain`, `errorCode` |
-| `paywall_fetch_error` | `placement`, `error`, `errorDomain`, `errorCode` |
+| `purchase_failed` | `purchase_service`, `reason`, `product_id`, `placement_id`, `error_domain`, `error_code`, `price`, `currency`, `paywall_id`, `presentation_id`, `variation_id` |
+| `restore_failed` | `purchase_service`, `reason`, `error_domain`, `error_code` |
+| `prices_load_failed` | `purchase_service`, `reason`, `error_description`, `error_domain`, `error_code`, `failed_identifiers` |
+| `paywall_show_failed` | `purchase_service`, `placement_id`, `reason`, `error_description`, `error_domain`, `error_code` |
+| `paywall_fetch_failed` | `purchase_service`, `placement_id`, `error_description`, `error_domain`, `error_code` |
 
 ---
 
@@ -125,7 +122,7 @@
 | `storekit_error` | Ошибка App Store / StoreKit |
 | `unknown` | Неизвестная ошибка |
 
-### Внутренние коды ошибок (`errorCode`)
+### Внутренние коды ошибок (`error_code`)
 
 Собственные коды (отрицательные, чтобы не пересекаться с кодами Apple/Adapty):
 
