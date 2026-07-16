@@ -152,13 +152,17 @@ public protocol AnalyticsServiceProtocol: AnyObject {
 /// 3. `initAdjust()` — starts the Adjust SDK and forwards the Adjust device ID and
 ///    attribution to Adapty.
 /// 4. `applicationDidBecomeActive(_:)` — starts the AppsFlyer session.
-///
-/// ## China region support
-///
-/// When `isRunningInChina` is `true`, Adapty is configured with the `.cn` server
-/// cluster and `observerMode: true` so that direct StoreKit transactions are used
-/// instead of Adapty-managed purchases.
+///.
 class AnalyticsService: NSObject, AnalyticsServiceProtocol {
+    private enum UserIdentitySource {
+        case firebase
+        case fallback
+    }
+
+    private struct ResolvedUserIdentity {
+        let userID: String
+        let source: UserIdentitySource
+    }
 
     // MARK: - Private SDK references
 
@@ -197,6 +201,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     private var didSetupAnalytics = false
     
     private var didSetupMixPanel = false
+    private let fallbackCustomerUserIDKey = "com.aweb.analytics.fallback_customer_user_id"
 
     // MARK: - App lifecycle
 
@@ -294,28 +299,23 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     /// completes. The method is idempotent — Firebase reuses the cached anonymous
     /// credential on subsequent calls.
     func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey: Any]?) async {
-        do {
-            let signInResult = try await Auth.auth().signInAnonymously()
-            let userID = signInResult.user.uid
-            firebase.setUserID(userID)
-            _userID = userID
-            appsflyer.customerUserID = userID
-            SentrySDK.setUser(.init(userId: userID))
-            mixPanelIdentifyUser(userID)
-            if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
+        let identity = await resolveCustomerIdentity()
+        applyUserIdentity(identity)
+
+        if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
+            do {
                 let configuration = AdaptyConfiguration
                     .builder(withAPIKey: key)
                     .with(logLevel: .verbose)
-                    .with(customerUserId: userID)
+                    .with(customerUserId: identity.userID)
                     .with(serverCluster: await adaptyServerClusterForCurrentUser())
                     .with(ipAddressCollectionDisabled: isRunningInChina)
-                    .with(observerMode: false)
                     .build()
                 try await adapty.activate(with: configuration)
                 try await adaptyUI.activate()
 
                 try await adapty.updateCollectingRefundDataConsent(true)
-                
+
                 Adapty.setLogHandler { record in
                     Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
                 }
@@ -338,12 +338,48 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     key: "facebook_anonymous_id",
                     value: AppEvents.shared.anonymousID
                 )
-
-//                initAdjust()
+            } catch {
+                Log.printLog(l: .error, str: "Adapty init failed " + error.localizedDescription)
             }
-        } catch {
-            Log.printLog(l: .error, str: error.localizedDescription)
         }
+    }
+
+    private func resolveCustomerIdentity() async -> ResolvedUserIdentity {
+        do {
+            let signInResult = try await Auth.auth().signInAnonymously()
+            return .init(userID: signInResult.user.uid, source: .firebase)
+        } catch {
+            let fallbackID = fallbackCustomerUserID()
+            Log.printLog(
+                l: .error,
+                str: "Firebase auth failed, using fallback_id: \(error.localizedDescription)"
+            )
+            return .init(userID: fallbackID, source: .fallback)
+        }
+    }
+
+    private func fallbackCustomerUserID() -> String {
+        let defaults = UserDefaults.standard
+
+        if let existingID = defaults.string(forKey: fallbackCustomerUserIDKey),
+           !existingID.isEmpty {
+            return existingID
+        }
+
+        let generatedID = "fallback_" + UUID().uuidString.lowercased()
+        defaults.set(generatedID, forKey: fallbackCustomerUserIDKey)
+        return generatedID
+    }
+
+    private func applyUserIdentity(_ identity: ResolvedUserIdentity) {
+        if identity.source == .firebase {
+            firebase.setUserID(identity.userID)
+        }
+
+        _userID = identity.userID
+        appsflyer.customerUserID = identity.userID
+        SentrySDK.setUser(.init(userId: identity.userID))
+        mixPanelIdentifyUser(identity.userID)
     }
 
     // MARK: - Adjust initialisation
