@@ -303,48 +303,74 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         applyUserIdentity(identity)
 
         if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
+            let configuration = AdaptyConfiguration
+                .builder(withAPIKey: key)
+                .with(logLevel: .verbose)
+                .with(customerUserId: identity.userID)
+                .with(serverCluster: await adaptyServerClusterForCurrentUser())
+                .with(ipAddressCollectionDisabled: isRunningInChina)
+                .build()
+
             do {
-                let configuration = AdaptyConfiguration
-                    .builder(withAPIKey: key)
-                    .with(logLevel: .verbose)
-                    .with(customerUserId: identity.userID)
-                    .with(serverCluster: await adaptyServerClusterForCurrentUser())
-                    .with(ipAddressCollectionDisabled: isRunningInChina)
-                    .build()
                 try await adapty.activate(with: configuration)
+            } catch {
+                Log.printLog(l: .error, str: "Adapty activate failed " + error.localizedDescription)
+            }
+
+            do {
                 try await adaptyUI.activate()
+            } catch {
+                Log.printLog(l: .error, str: "AdaptyUI activate failed " + error.localizedDescription)
+            }
 
+            do {
                 try await adapty.updateCollectingRefundDataConsent(true)
+            } catch {
+                Log.printLog(l: .error, str: "Adapty refund consent failed " + error.localizedDescription)
+            }
 
-                Adapty.setLogHandler { record in
-                    Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
-                }
+            Adapty.setLogHandler { record in
+                Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
+            }
 
-                // Register cross-SDK identifiers so Adapty can join events from
-                // Firebase, Mixpanel, and Facebook in its analytics pipelines.
-                if let appInstanceId = Analytics.appInstanceID() {
+            // Register cross-SDK identifiers so Adapty can join events from
+            // Firebase, Mixpanel, and Facebook in its analytics pipelines.
+            if let appInstanceId = Analytics.appInstanceID() {
+                do {
                     try await Adapty.setIntegrationIdentifier(
                         key: "firebase_app_instance_id",
                         value: appInstanceId
                     )
+                } catch {
+                    Log.printLog(l: .error, str: "Adapty firebase integration id failed " + error.localizedDescription)
                 }
+            }
 
+            do {
                 try await Adapty.setIntegrationIdentifier(
                     key: "mixpanel_user_id",
                     value: Mixpanel.mainInstance().distinctId
                 )
+            } catch {
+                Log.printLog(l: .error, str: "Adapty mixpanel integration id failed " + error.localizedDescription)
+            }
 
+            do {
                 try await Adapty.setIntegrationIdentifier(
                     key: "facebook_anonymous_id",
                     value: AppEvents.shared.anonymousID
                 )
             } catch {
-                Log.printLog(l: .error, str: "Adapty init failed " + error.localizedDescription)
+                Log.printLog(l: .error, str: "Adapty facebook integration id failed " + error.localizedDescription)
             }
         }
     }
 
     private func resolveCustomerIdentity() async -> ResolvedUserIdentity {
+        if let currentUser = Auth.auth().currentUser {
+            return .init(userID: currentUser.uid, source: .firebase)
+        }
+
         do {
             let signInResult = try await Auth.auth().signInAnonymously()
             return .init(userID: signInResult.user.uid, source: .firebase)
