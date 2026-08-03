@@ -34,3 +34,40 @@ public protocol EventProtocol {
     /// separate keys.
     var params: [String: Any] { get }
 }
+
+/// Logged when an analytics / subscription SDK setup step fails during cold start.
+///
+/// Event name: `analytics_setup_failed`
+struct AnalyticsSetupFailedEvent: EventProtocol {
+
+    var name: String { "analytics_setup_failed" }
+
+    /// Stable snake_case key identifying the failing operation.
+    let operation: String
+
+    /// Human-readable description of the underlying error.
+    let errorDescription: String
+
+    /// The `NSError.domain` of the underlying error.
+    let errorDomain: String
+
+    /// The numeric error code from the underlying error.
+    let errorCode: Int
+
+    var params: [String: Any] {
+        [
+            "operation": operation,
+            "error_description": errorDescription,
+            "error_domain": errorDomain,
+            "error_code": errorCode
+        ]
+    }
+
+    init(operation: String, error: Error) {
+        let nsError = error as NSError
+        self.operation = operation
+        self.errorDescription = error.localizedDescription
+        self.errorDomain = nsError.domain
+        self.errorCode = nsError.code
+    }
+}

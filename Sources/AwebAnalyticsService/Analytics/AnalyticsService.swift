@@ -315,18 +315,21 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 try await adapty.activate(with: configuration)
             } catch {
                 Log.printLog(l: .error, str: "Adapty activate failed " + error.localizedDescription)
+                log(e: AnalyticsSetupFailedEvent(operation: "adapty_activate", error: error))
             }
 
             do {
                 try await adaptyUI.activate()
             } catch {
                 Log.printLog(l: .error, str: "AdaptyUI activate failed " + error.localizedDescription)
+                log(e: AnalyticsSetupFailedEvent(operation: "adapty_ui_activate", error: error))
             }
 
             do {
                 try await adapty.updateCollectingRefundDataConsent(true)
             } catch {
                 Log.printLog(l: .error, str: "Adapty refund consent failed " + error.localizedDescription)
+                log(e: AnalyticsSetupFailedEvent(operation: "adapty_refund_consent", error: error))
             }
 
             Adapty.setLogHandler { record in
@@ -343,6 +346,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     )
                 } catch {
                     Log.printLog(l: .error, str: "Adapty firebase integration id failed " + error.localizedDescription)
+                    log(e: AnalyticsSetupFailedEvent(operation: "adapty_firebase_integration_id", error: error))
                 }
             }
 
@@ -353,6 +357,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 )
             } catch {
                 Log.printLog(l: .error, str: "Adapty mixpanel integration id failed " + error.localizedDescription)
+                log(e: AnalyticsSetupFailedEvent(operation: "adapty_mixpanel_integration_id", error: error))
             }
 
             do {
@@ -362,6 +367,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 )
             } catch {
                 Log.printLog(l: .error, str: "Adapty facebook integration id failed " + error.localizedDescription)
+                log(e: AnalyticsSetupFailedEvent(operation: "adapty_facebook_integration_id", error: error))
             }
         }
     }
