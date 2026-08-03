@@ -584,10 +584,10 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                 Task {
                     do {
                         try await Adapty.updateProfile(params: builder.build())
-                        c.resume(returning: status)
                     } catch {
                         Log.printLog(l: .error, str: error.localizedDescription)
                     }
+                    c.resume(returning: status)
                 }
             }
         }
