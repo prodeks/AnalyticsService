@@ -199,6 +199,10 @@ class AdaptyPaywallService: PaywallServiceProtocol {
     }
     
     private func logPaywallFailed(placement: String, metadata: AnalyticsErrorMetadata) {
+        Log.printLog(
+            l: .error,
+            str: "Failed to show paywall for placement: \(placement) with error: \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+        )
         analyticsService.log(
             e: PaywallFailedEvent(
                 source: .adapty,
