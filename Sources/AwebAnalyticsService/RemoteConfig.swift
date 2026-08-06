@@ -48,20 +48,22 @@ class RemoteConfigService: RemoteConfigServiceProtocol {
     func fetch(_ completion: @escaping () -> Void) {
         remoteConfig.fetch { status, error in
             Log.printLog(l: .debug, str: status.description)
-            if let error {
-                Log.printLog(l: .error, str: error.localizedDescription)
+            if status != .success {
+                if let error {
+                    Log.printLog(l: .error, str: error.localizedDescription)
+                } else {
+                    Log.printLog(l: .error, str: status.description)
+                }
+                completion()
+                return
             }
             
-            if status == .success {
-                self.remoteConfig.activate { _, error in
-                    if let error {
-                        Log.printLog(l: .error, str: error.localizedDescription)
-                    } else {
-                        Log.printLog(l: .debug, str: "Remote config activated")
-                    }
-                    completion()
+            self.remoteConfig.activate { _, error in
+                if let error {
+                    Log.printLog(l: .error, str: error.localizedDescription)
+                } else {
+                    Log.printLog(l: .debug, str: "Remote config activated")
                 }
-            } else {
                 completion()
             }
         }

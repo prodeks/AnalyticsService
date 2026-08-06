@@ -99,6 +99,12 @@ class PurchaseService: PurchaseServiceProtocol {
                         checkoutContext: checkoutContext,
                         completion: completion
                     )
+                } else if result.isPurchasePending {
+                    Log.printLog(
+                        l: .error,
+                        str: "Unexpected pending Adapty purchase for product \(product.vendorProductId) on placement \(placement)"
+                    )
+                    completion(.fail)
                 } else {
                     if let profile = result.profile {
                         self.updateSubscriptionState(from: profile)
@@ -163,6 +169,10 @@ class PurchaseService: PurchaseServiceProtocol {
                 completion?(status.isSubActive)
             case .failure(let error):
                 let metadata = PaywallFailureMetadata(error: error)
+                Log.printLog(
+                    l: .error,
+                    str: "Adapty restore failed: \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+                )
                 if let logEvent = self?.logEvent {
                     PaywallEventLogger.restoreFailed(
                         reason: metadata.reason,
@@ -254,6 +264,10 @@ class PurchaseService: PurchaseServiceProtocol {
             )
         } else {
             let metadata = PaywallFailureMetadata(error: error)
+            Log.printLog(
+                l: .error,
+                str: "Adapty purchase failed for product \(checkoutContext.productID) on placement \(checkoutContext.placement): \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+            )
             if let logEvent {
                 PaywallEventLogger.purchaseFailed(
                     checkoutContext,

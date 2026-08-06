@@ -125,7 +125,6 @@ class AdaptyPaywallService: PaywallServiceProtocol {
                         presentationContext: context
                     )
                 } catch {
-                    Log.printLog(l: .error, str: "Failed to create Adapty paywall controller: \(error)")
                     logPaywallFailed(
                         placement: placement.identifier,
                         metadata: AnalyticsErrorMetadata(error: error)
@@ -162,7 +161,14 @@ class AdaptyPaywallService: PaywallServiceProtocol {
                             products = try await Adapty.getPaywallProducts(paywall: paywall)
                         } catch {
                             self.logPricesFailed(metadata: AnalyticsErrorMetadata(error: error))
-                            throw error
+                            self.analyticsService.log(
+                                e: PaywallFetchErrorEvent(
+                                    source: .adapty,
+                                    placement: identifier,
+                                    error: error
+                                )
+                            )
+                            return nil
                         }
                         
                         return .customPaywall(
@@ -174,6 +180,10 @@ class AdaptyPaywallService: PaywallServiceProtocol {
                         )
                     }
                 } catch {
+                    Log.printLog(
+                        l: .error,
+                        str: "Failed to fetch paywall for placement \(identifier): \(error.localizedDescription)"
+                    )
                     self.analyticsService.log(
                         e: PaywallFetchErrorEvent(
                             source: .adapty,
@@ -190,6 +200,10 @@ class AdaptyPaywallService: PaywallServiceProtocol {
     }
     
     private func logPricesFailed(metadata: AnalyticsErrorMetadata) {
+        Log.printLog(
+            l: .error,
+            str: "Failed to load paywall products: \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+        )
         analyticsService.log(
             e: PricesFailedEvent(
                 source: .adapty,

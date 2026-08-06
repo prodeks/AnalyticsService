@@ -132,6 +132,10 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
                 }
             }
         } else {
+            Log.printLog(
+                l: .error,
+                str: "Selected IAP \(iap.productID) not found in Adapty products for placement \(adaptyPaywallData.placement)"
+            )
             self.presentCannotPurchaseAlert()
             self.overlayView.isHidden = true
         }

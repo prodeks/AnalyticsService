@@ -302,73 +302,76 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         let identity = await resolveCustomerIdentity()
         applyUserIdentity(identity)
 
-        if let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey {
-            let configuration = AdaptyConfiguration
-                .builder(withAPIKey: key)
-                .with(logLevel: .verbose)
-                .with(customerUserId: identity.userID)
-                .with(serverCluster: await adaptyServerClusterForCurrentUser())
-                .with(ipAddressCollectionDisabled: isRunningInChina)
-                .build()
+        guard let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey else {
+            Log.printLog(l: .error, str: "Adapty activation skipped: subscriptionServiceKey is missing")
+            return
+        }
 
-            do {
-                try await adapty.activate(with: configuration)
-            } catch {
-                Log.printLog(l: .error, str: "Adapty activate failed " + error.localizedDescription)
-                log(e: AnalyticsSetupFailedEvent(operation: "adapty_activate", error: error))
-            }
+        let configuration = AdaptyConfiguration
+            .builder(withAPIKey: key)
+            .with(logLevel: .verbose)
+            .with(customerUserId: identity.userID)
+            .with(serverCluster: await adaptyServerClusterForCurrentUser())
+            .with(ipAddressCollectionDisabled: isRunningInChina)
+            .build()
 
-            do {
-                try await adaptyUI.activate()
-            } catch {
-                Log.printLog(l: .error, str: "AdaptyUI activate failed " + error.localizedDescription)
-                log(e: AnalyticsSetupFailedEvent(operation: "adapty_ui_activate", error: error))
-            }
+        do {
+            try await adapty.activate(with: configuration)
+        } catch {
+            Log.printLog(l: .error, str: "Adapty activate failed " + error.localizedDescription)
+            log(e: AnalyticsSetupFailedEvent(operation: "adapty_activate", error: error))
+        }
+        
+        Adapty.setLogHandler { record in
+            Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
+        }
 
-            do {
-                try await adapty.updateCollectingRefundDataConsent(true)
-            } catch {
-                Log.printLog(l: .error, str: "Adapty refund consent failed " + error.localizedDescription)
-                log(e: AnalyticsSetupFailedEvent(operation: "adapty_refund_consent", error: error))
-            }
+        do {
+            try await adaptyUI.activate()
+        } catch {
+            Log.printLog(l: .error, str: "AdaptyUI activate failed " + error.localizedDescription)
+            log(e: AnalyticsSetupFailedEvent(operation: "adapty_ui_activate", error: error))
+        }
 
-            Adapty.setLogHandler { record in
-                Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
-            }
+        do {
+            try await adapty.updateCollectingRefundDataConsent(true)
+        } catch {
+            Log.printLog(l: .error, str: "Adapty refund consent failed " + error.localizedDescription)
+            log(e: AnalyticsSetupFailedEvent(operation: "adapty_refund_consent", error: error))
+        }
 
-            // Register cross-SDK identifiers so Adapty can join events from
-            // Firebase, Mixpanel, and Facebook in its analytics pipelines.
-            if let appInstanceId = Analytics.appInstanceID() {
-                do {
-                    try await Adapty.setIntegrationIdentifier(
-                        key: "firebase_app_instance_id",
-                        value: appInstanceId
-                    )
-                } catch {
-                    Log.printLog(l: .error, str: "Adapty firebase integration id failed " + error.localizedDescription)
-                    log(e: AnalyticsSetupFailedEvent(operation: "adapty_firebase_integration_id", error: error))
-                }
-            }
-
+        // Register cross-SDK identifiers so Adapty can join events from
+        // Firebase, Mixpanel, and Facebook in its analytics pipelines.
+        if let appInstanceId = Analytics.appInstanceID() {
             do {
                 try await Adapty.setIntegrationIdentifier(
-                    key: "mixpanel_user_id",
-                    value: Mixpanel.mainInstance().distinctId
+                    key: "firebase_app_instance_id",
+                    value: appInstanceId
                 )
             } catch {
-                Log.printLog(l: .error, str: "Adapty mixpanel integration id failed " + error.localizedDescription)
-                log(e: AnalyticsSetupFailedEvent(operation: "adapty_mixpanel_integration_id", error: error))
+                Log.printLog(l: .error, str: "Adapty firebase integration id failed " + error.localizedDescription)
+                log(e: AnalyticsSetupFailedEvent(operation: "adapty_firebase_integration_id", error: error))
             }
+        }
 
-            do {
-                try await Adapty.setIntegrationIdentifier(
-                    key: "facebook_anonymous_id",
-                    value: AppEvents.shared.anonymousID
-                )
-            } catch {
-                Log.printLog(l: .error, str: "Adapty facebook integration id failed " + error.localizedDescription)
-                log(e: AnalyticsSetupFailedEvent(operation: "adapty_facebook_integration_id", error: error))
-            }
+        do {
+            try await Adapty.setIntegrationIdentifier(
+                key: "mixpanel_user_id",
+                value: Mixpanel.mainInstance().distinctId
+            )
+        } catch {
+            Log.printLog(l: .error, str: "Adapty mixpanel integration id failed " + error.localizedDescription)
+            log(e: AnalyticsSetupFailedEvent(operation: "adapty_mixpanel_integration_id", error: error))
+        }
+
+        do {
+            try await Adapty.setIntegrationIdentifier(
+                key: "facebook_anonymous_id",
+                value: AppEvents.shared.anonymousID
+            )
+        } catch {
+            Log.printLog(l: .error, str: "Adapty facebook integration id failed " + error.localizedDescription)
+            log(e: AnalyticsSetupFailedEvent(operation: "adapty_facebook_integration_id", error: error))
         }
     }
 
@@ -582,8 +585,11 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
                     Log.printLog(l: .debug, str: "IDFA: \(idfa)")
                     let idfv = UIDevice.current.identifierForVendor?.uuidString ?? ""
                     Log.printLog(l: .debug, str: "IDFV: \(idfv)")
-                    if let token = try? AAAttribution.attributionToken() {
+                    do {
+                        let token = try AAAttribution.attributionToken()
                         Log.printLog(l: .debug, str: "AttributionToken: \(token)")
+                    } catch {
+                        Log.printLog(l: .error, str: "ASA attribution token failed: \(error.localizedDescription)")
                     }
                 }
                 let builder = AdaptyProfileParameters.Builder().with(appTrackingTransparencyStatus: status)
@@ -744,8 +750,18 @@ extension AnalyticsService: AppsFlyerLibDelegate, DeepLinkDelegate, PurchaseReve
         _attributionData = conversionInfo
 
         let afUID = AppsFlyerLib.shared().getAppsFlyerUID()
-        Adapty.setIntegrationIdentifier(key: "appsflyer_id", value: afUID)
-        Adapty.updateAttribution(conversionInfo, source: "appsflyer")
+        Task {
+            do {
+                try await Adapty.setIntegrationIdentifier(key: "appsflyer_id", value: afUID)
+            } catch {
+                Log.printLog(l: .error, str: "Adapty AppsFlyer integration id failed: \(error.localizedDescription)")
+            }
+            do {
+                try await Adapty.updateAttribution(conversionInfo, source: "appsflyer")
+            } catch {
+                Log.printLog(l: .error, str: "Adapty AppsFlyer attribution update failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     public func onConversionDataFail(_ error: any Error) {

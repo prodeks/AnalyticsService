@@ -127,6 +127,10 @@ class AdaptyPaywallControllerDelegateProxy: NSObject, AdaptyPaywallControllerDel
         if let forwarding {
             return forwarding.paywallController(controller, didFailLoadingProductsWith: error)
         } else {
+            Log.printLog(
+                l: .error,
+                str: "Adapty paywall delegate forwarding is nil while loading products failed: \(error.localizedDescription)"
+            )
             return false
         }
     }
@@ -169,14 +173,22 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         didFinishPurchase product: any AdaptyPaywallProduct,
         purchaseResult: AdaptyPurchaseResult
     ) {
-        purchaseService.subscriptionStatus = purchaseResult.isPurchaseSuccess ? .active : .inactive
         let context = checkoutContext(product: product)
         if purchaseResult.isPurchaseSuccess {
+            purchaseService.subscriptionStatus = .active
             PaywallEventLogger.purchaseSucceeded(context, log: analyticsService.log(e:))
+            dismissPaywall(purchasedProductID: product.vendorProductId)
         } else if purchaseResult.isPurchaseCancelled {
+            purchaseService.subscriptionStatus = .inactive
             PaywallEventLogger.purchaseCancelled(context, log: analyticsService.log(e:))
+            dismissPaywall(purchasedProductID: nil)
+        } else {
+            purchaseService.subscriptionStatus = .inactive
+            Log.printLog(
+                l: .error,
+                str: "Unexpected Adapty purchase result for product \(product.vendorProductId) on placement \(placement): pending=\(purchaseResult.isPurchasePending)"
+            )
         }
-        dismissPaywall(purchasedProductID: product.vendorProductId)
     }
     
     public func paywallController(
@@ -185,6 +197,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         error: AdaptyError
     ) {
         let metadata = PaywallFailureMetadata(error: error)
+        Log.printLog(
+            l: .error,
+            str: "Adapty purchase failed for product \(product.vendorProductId) on placement \(placement): \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+        )
         PaywallEventLogger.purchaseFailed(
             checkoutContext(product: product),
             adaptyError: error,
@@ -285,6 +301,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     }
     
     private func logRestoreFailed(metadata: PaywallFailureMetadata) {
+        Log.printLog(
+            l: .error,
+            str: "Adapty restore failed on placement \(placement): \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+        )
         PaywallEventLogger.restoreFailed(
             reason: metadata.reason,
             source: .adapty,
@@ -295,6 +315,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     }
     
     private func logPricesFailed(metadata: AnalyticsErrorMetadata) {
+        Log.printLog(
+            l: .error,
+            str: "Adapty products failed to load on placement \(placement): \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+        )
         analyticsService.log(
             e: PricesFailedEvent(
                 source: .adapty,
@@ -304,6 +328,10 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
     }
     
     private func logPaywallFailed(metadata: AnalyticsErrorMetadata) {
+        Log.printLog(
+            l: .error,
+            str: "Adapty paywall failed on placement \(placement): \(metadata.errorDomain) \(metadata.errorCode) \(metadata.reasonRawValue)"
+        )
         analyticsService.log(
             e: PaywallFailedEvent(
                 source: .adapty,

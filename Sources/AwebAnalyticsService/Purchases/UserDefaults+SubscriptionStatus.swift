@@ -10,15 +10,28 @@ extension UserDefaults {
     /// which is the safe default for new installs or data migrations.
     var subscriptionStatus: SubscriptionStatus {
         get {
-            guard let data = data(forKey: Self.subscriptionStatusKey),
-                  let status = try? JSONDecoder().decode(SubscriptionStatus.self, from: data) else {
+            guard let data = data(forKey: Self.subscriptionStatusKey) else {
                 return .inactive
             }
-            return status
+            do {
+                return try JSONDecoder().decode(SubscriptionStatus.self, from: data)
+            } catch {
+                Log.printLog(
+                    l: .error,
+                    str: "Failed to decode subscription status: \(error.localizedDescription)"
+                )
+                return .inactive
+            }
         }
         set {
-            if let data = try? JSONEncoder().encode(newValue) {
+            do {
+                let data = try JSONEncoder().encode(newValue)
                 set(data, forKey: Self.subscriptionStatusKey)
+            } catch {
+                Log.printLog(
+                    l: .error,
+                    str: "Failed to encode subscription status: \(error.localizedDescription)"
+                )
             }
         }
     }
