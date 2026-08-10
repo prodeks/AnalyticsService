@@ -318,6 +318,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     ) async -> Bool {
         do {
             try await work()
+            Log.printLog(l: .debug, str: "Setup step \(operation) succeeded")
             return true
         } catch {
             Log.printLog(l: .error, str: "Setup step \(operation) failed: \(error.localizedDescription)")
