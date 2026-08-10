@@ -4,9 +4,9 @@ import StoreKit
 /// The single entry point for analytics, purchases, paywalls, and remote configuration.
 ///
 /// `PurchasesAndAnalytics` wires the package's services together and runs a coordinated
-/// cold-start sequence: detect the user's region, configure the paywall backend,
-/// sign in to Firebase, activate Adapty, and prefetch paywalls, subscription state,
-/// and remote config in parallel.
+/// cold-start sequence: detect the user's region, activate Adapty with a local
+/// identity, reconcile Firebase in the background, and prefetch paywalls,
+/// subscription state, and remote config in parallel.
 ///
 /// ## Usage
 ///
@@ -116,7 +116,19 @@ import StoreKit
             Task {
                 let isRunningInChina = await self.isRunningInChina()
                 self._analytics.isRunningInChina = isRunningInChina
-                await self._analytics.firebaseSignIn(options)
+                // Activate Adapty under the cached identity, or anonymously on a first launch
+                // so the later identify merges the profile instead of replacing it.
+                let cachedIdentity = await self._analytics.applyCachedIdentity()
+                let isAdaptyActivated = await self._analytics.activateAdapty(
+                    customerUserID: cachedIdentity?.userID
+                )
+
+                // Adapty's identify cancels in-flight profile creation, which fails concurrent
+                // placement fetches with profileWasChanged, so let the profile settle first.
+                await self._analytics.reconcileIdentity(
+                    activatedIdentity: cachedIdentity,
+                    isAdaptyActivated: isAdaptyActivated
+                )
 
                 // Prefetch in parallel to minimise time-to-interactive after splash.
                 async let paywallsTask: Void = self._paywalls.fetchPaywallsAndProducts()
@@ -138,17 +150,47 @@ import StoreKit
     /// entitlement path instead of Adapty-managed purchases.
     ///
     /// Returns `true` when either signal matches a supported restricted region
-    /// Storefront is preferred because it reflects the App Store the user is signed
-    /// into. Locale is a fallback for environments without a storefront (e.g. Simulator).
+    /// Locale is checked synchronously so China routing works offline, followed by the
+    /// cached StoreKit 1 storefront. Only when both are inconclusive does this fall back
+    /// to the async storefront, which is raced against a short timeout because StoreKit
+    /// can stall without a network.
     ///
     /// When `true`, ``RegionalPaywallService/configure(isRunningInChina:)`` selects
     /// `DirectStoreKitPaywallService` and sets `PurchaseService.usesStoreKitEntitlementsForAccess`.
     private func isRunningInChina() async -> Bool {
-        let storefront = await Storefront.current?.countryCode
         let locale = Locale.current.region?.identifier
+        guard locale != "CN" else { return true }
 
-        let result = storefront == "CHN" || locale == "CN"
-        return result
+        if let cached = legacyStorefrontCountryCode() {
+            return cached == "CHN"
+        }
+
+        return await storefrontCountryCodeWithTimeout() == "CHN"
+    }
+
+    /// Reads the storefront synchronously, keeping startup off the async StoreKit path.
+    ///
+    /// Marked deprecated so the deprecated `SKPaymentQueue.storefront` access does not warn;
+    /// once the deployment target reaches iOS 18 this can be deleted along with its call site.
+    @available(iOS, deprecated: 18.0, message: "Fast path only; callers already fall back to Storefront.current.")
+    private func legacyStorefrontCountryCode() -> String? {
+        SKPaymentQueue.default().storefront?.countryCode
+    }
+
+    private func storefrontCountryCodeWithTimeout() async -> String? {
+        await withTaskGroup(of: String?.self, returning: String?.self) { group in
+            group.addTask {
+                await Storefront.current?.countryCode
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                return nil
+            }
+
+            let countryCode = await group.next() ?? nil
+            group.cancelAll()
+            return countryCode
+        }
     }
 
     // MARK: - Event bridge

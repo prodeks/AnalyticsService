@@ -146,20 +146,21 @@ public protocol AnalyticsServiceProtocol: AnyObject {
 /// ## Initialisation sequence
 ///
 /// 1. `setupAnalyticsIfNeeded(options:)` — one-time SDK configuration.
-/// 2. `firebaseSignIn(_:)` — anonymous Firebase Auth sign-in; on success activates
-///    Adapty (selecting the China cluster when needed) and registers cross-SDK user
-///    identifiers.
+/// 2. `applyCachedIdentity()` → `activateAdapty(customerUserID:)` → `reconcileIdentity(…)` —
+///    activates Adapty under the cached Firebase identity (or anonymously on a first launch),
+///    then resolves the final identity and registers cross-SDK identifiers. Run in this order;
+///    see ``PurchasesAndAnalytics`` for the startup sequence.
 /// 3. `initAdjust()` — starts the Adjust SDK and forwards the Adjust device ID and
 ///    attribution to Adapty.
 /// 4. `applicationDidBecomeActive(_:)` — starts the AppsFlyer session.
 ///.
 class AnalyticsService: NSObject, AnalyticsServiceProtocol {
-    private enum UserIdentitySource {
+    enum UserIdentitySource {
         case firebase
         case fallback
     }
 
-    private struct ResolvedUserIdentity {
+    struct ResolvedUserIdentity {
         let userID: String
         let source: UserIdentitySource
     }
@@ -180,6 +181,10 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     /// the user is running in the Chinese App Store.
     var isRunningInChina: Bool = false
 
+    /// Post-identity Adapty setup (refund consent, cross-SDK identifiers). Retained so the
+    /// work is cancellable and observable rather than being fire-and-forget.
+    private var adaptyIntegrationSetup: Task<Void, Never>?
+
     @Published public var _userID = ""
     public var userID: AnyPublisher<String, Never> {
         $_userID.eraseToAnyPublisher()
@@ -194,7 +199,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     /// every call (including subsequent no-op calls).
     ///
     /// Allows the host app to perform work that depends on the analytics layer being
-    /// ready (e.g. starting `firebaseSignIn`) without subclassing `AnalyticsService`.
+    /// ready (e.g. activating Adapty) without subclassing `AnalyticsService`.
     public var analyticsStarted: (([UIApplication.LaunchOptionsKey: Any]?) -> Void)?
 
     /// Guards against running the SDK setup block more than once.
@@ -292,107 +297,175 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         }
     }
     
-    /// Signs in anonymously with Firebase, then activates Adapty and registers
-    /// cross-SDK user identifiers so attribution data can be joined server-side.
+    // MARK: - Startup identity
+    //
+    // Run in this order, driven by `PurchasesAndAnalytics`, before any paywall is fetched:
+    //
+    //   applyCachedIdentity() → activateAdapty(customerUserID:) → reconcileIdentity(…)
+    //
+    // No step throws: a failing SDK degrades the launch instead of blocking it, and every
+    // failure surfaces as a log line plus an `AnalyticsSetupFailedEvent`.
+
+    /// Runs one startup step, turning a thrown error into a log line and an
+    /// ``AnalyticsSetupFailedEvent``, and reporting whether it succeeded.
     ///
-    /// Called by the host app's coordinator after ``setupAnalyticsIfNeeded(options:)``
-    /// completes. The method is idempotent — Firebase reuses the cached anonymous
-    /// credential on subsequent calls.
-    func firebaseSignIn(_ options: [UIApplication.LaunchOptionsKey: Any]?) async {
-        let identity = await resolveCustomerIdentity()
-        applyUserIdentity(identity)
+    /// - Parameter operation: Analytics identifier for the step. Dashboards group on this
+    ///   value, so existing names must stay stable.
+    @discardableResult
+    private func runSetupStep(
+        _ operation: String,
+        _ work: () async throws -> Void
+    ) async -> Bool {
+        do {
+            try await work()
+            return true
+        } catch {
+            Log.printLog(l: .error, str: "Setup step \(operation) failed: \(error.localizedDescription)")
+            log(e: AnalyticsSetupFailedEvent(operation: operation, error: error))
+            return false
+        }
+    }
+
+    /// Pushes the cached Firebase identity to Firebase, Sentry, Mixpanel, and AppsFlyer.
+    ///
+    /// Reads local state only, so it never blocks on the network. Returns `nil` on a first
+    /// launch, before any anonymous credential has been persisted; pass that result straight
+    /// on to ``activateAdapty(customerUserID:)``.
+    func applyCachedIdentity() async -> ResolvedUserIdentity? {
+        guard let identity = cachedFirebaseIdentity() else {
+            Log.printLog(l: .debug, str: "Identity: no cached Firebase user")
+            return nil
+        }
+
+        Log.printLog(l: .debug, str: "Identity: cached Firebase user \(identity.userID)")
+        await applyUserIdentity(identity)
+        return identity
+    }
+
+    /// Activates Adapty and AdaptyUI, reporting whether Adapty is usable this session.
+    ///
+    /// Pass `nil` when no Firebase credential is cached, so Adapty activates **anonymously**
+    /// instead of under the fallback ID. `Adapty.identify` merges an anonymous profile in
+    /// place, while re-identifying an already-named profile discards the local profile state —
+    /// the anonymous path is what keeps one profile per install.
+    func activateAdapty(customerUserID: String?) async -> Bool {
+        Adapty.setLogHandler { record in
+            Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
+        }
 
         guard let key = PurchasesAndAnalytics.Keys.subscriptionServiceKey else {
             Log.printLog(l: .error, str: "Adapty activation skipped: subscriptionServiceKey is missing")
-            return
+            return false
         }
 
         let configuration = AdaptyConfiguration
             .builder(withAPIKey: key)
             .with(logLevel: .verbose)
-            .with(customerUserId: identity.userID)
+            .with(customerUserId: customerUserID)
             .with(serverCluster: await adaptyServerClusterForCurrentUser())
             .with(ipAddressCollectionDisabled: isRunningInChina)
             .build()
 
-        do {
+        let isActivated = await runSetupStep("adapty_activate") {
             try await adapty.activate(with: configuration)
-        } catch {
-            Log.printLog(l: .error, str: "Adapty activate failed " + error.localizedDescription)
-            log(e: AnalyticsSetupFailedEvent(operation: "adapty_activate", error: error))
         }
-        
-        Adapty.setLogHandler { record in
-            Log.printLog(l: .init(record.level), str: "[Adapty]" + record.message)
-        }
+        guard isActivated else { return false }
 
-        do {
+        await runSetupStep("adapty_ui_activate") {
             try await adaptyUI.activate()
-        } catch {
-            Log.printLog(l: .error, str: "AdaptyUI activate failed " + error.localizedDescription)
-            log(e: AnalyticsSetupFailedEvent(operation: "adapty_ui_activate", error: error))
         }
+        return true
+    }
 
-        do {
-            try await adapty.updateCollectingRefundDataConsent(true)
-        } catch {
-            Log.printLog(l: .error, str: "Adapty refund consent failed " + error.localizedDescription)
-            log(e: AnalyticsSetupFailedEvent(operation: "adapty_refund_consent", error: error))
-        }
+    /// Resolves the final user identity and propagates it to every SDK.
+    ///
+    /// Signs in to Firebase anonymously when no credential was cached. If that produces a
+    /// different user than Adapty was activated with, the Adapty profile is switched to match.
+    /// A persisted local ID is used only when Firebase auth fails outright.
+    ///
+    /// Runs even when `isAdaptyActivated` is `false`, so Firebase Analytics, Sentry, Mixpanel,
+    /// and AppsFlyer still receive a user ID when the purchases SDK is unavailable.
+    ///
+    /// - Important: Await this before fetching paywalls. `Adapty.identify` cancels Adapty's
+    ///   in-flight profile creation, which fails concurrent placement fetches with
+    ///   `profileWasChanged`.
+    func reconcileIdentity(
+        activatedIdentity: ResolvedUserIdentity?,
+        isAdaptyActivated: Bool
+    ) async {
+        let identity = await resolveFirebaseIdentity()
+            ?? activatedIdentity
+            ?? .init(userID: fallbackCustomerUserID(), source: .fallback)
 
-        // Register cross-SDK identifiers so Adapty can join events from
-        // Firebase, Mixpanel, and Facebook in its analytics pipelines.
-        if let appInstanceId = Analytics.appInstanceID() {
-            do {
-                try await Adapty.setIntegrationIdentifier(
-                    key: "firebase_app_instance_id",
-                    value: appInstanceId
-                )
-            } catch {
-                Log.printLog(l: .error, str: "Adapty firebase integration id failed " + error.localizedDescription)
-                log(e: AnalyticsSetupFailedEvent(operation: "adapty_firebase_integration_id", error: error))
+        if identity.userID == activatedIdentity?.userID {
+            Log.printLog(l: .debug, str: "Identity: unchanged (\(identity.userID))")
+        } else {
+            Log.printLog(l: .debug, str: "Identity: switching to \(identity.userID) [\(identity.source)]")
+
+            if isAdaptyActivated {
+                await runSetupStep("adapty_identify") {
+                    try await adapty.identify(identity.userID)
+                }
             }
+            await applyUserIdentity(identity)
         }
 
-        do {
-            try await Adapty.setIntegrationIdentifier(
-                key: "mixpanel_user_id",
-                value: Mixpanel.mainInstance().distinctId
-            )
-        } catch {
-            Log.printLog(l: .error, str: "Adapty mixpanel integration id failed " + error.localizedDescription)
-            log(e: AnalyticsSetupFailedEvent(operation: "adapty_mixpanel_integration_id", error: error))
+        guard isAdaptyActivated else { return }
+
+        // Nothing else waits on these, so they stay off the paywall prefetch's critical path.
+        adaptyIntegrationSetup = Task { await self.setUpAdaptyIntegrations() }
+    }
+
+    /// Adapty configuration that depends on the final identity but that no other startup step
+    /// waits for: refund data consent and the cross-SDK integration identifiers.
+    private func setUpAdaptyIntegrations() async {
+        await runSetupStep("adapty_refund_consent") {
+            try await adapty.updateCollectingRefundDataConsent(true)
         }
 
-        do {
-            try await Adapty.setIntegrationIdentifier(
-                key: "facebook_anonymous_id",
-                value: AppEvents.shared.anonymousID
+        // Lets Adapty join events from Firebase, Mixpanel, and Facebook in its pipelines.
+        var identifiers = [
+            (operation: "adapty_mixpanel_integration_id", key: "mixpanel_user_id", value: Mixpanel.mainInstance().distinctId),
+            (operation: "adapty_facebook_integration_id", key: "facebook_anonymous_id", value: AppEvents.shared.anonymousID),
+        ]
+        if let appInstanceID = Analytics.appInstanceID() {
+            identifiers.append(
+                (operation: "adapty_firebase_integration_id", key: "firebase_app_instance_id", value: appInstanceID)
             )
-        } catch {
-            Log.printLog(l: .error, str: "Adapty facebook integration id failed " + error.localizedDescription)
-            log(e: AnalyticsSetupFailedEvent(operation: "adapty_facebook_integration_id", error: error))
+        }
+
+        for identifier in identifiers {
+            await runSetupStep(identifier.operation) {
+                try await Adapty.setIntegrationIdentifier(key: identifier.key, value: identifier.value)
+            }
         }
     }
 
-    private func resolveCustomerIdentity() async -> ResolvedUserIdentity {
-        if let currentUser = Auth.auth().currentUser {
-            return .init(userID: currentUser.uid, source: .firebase)
-        }
+    /// Returns the cached Firebase identity without touching the network, or `nil` on a
+    /// first launch when no anonymous credential has been persisted yet.
+    private func cachedFirebaseIdentity() -> ResolvedUserIdentity? {
+        Auth.auth().currentUser.map { .init(userID: $0.uid, source: .firebase) }
+    }
+
+    /// Returns the Firebase identity, signing in anonymously when nothing is cached, or `nil`
+    /// when Firebase auth is unreachable.
+    ///
+    /// The cached branch costs nothing, so this is only slow on a genuine first launch.
+    private func resolveFirebaseIdentity() async -> ResolvedUserIdentity? {
+        if let cached = cachedFirebaseIdentity() { return cached }
 
         do {
             let signInResult = try await Auth.auth().signInAnonymously()
             return .init(userID: signInResult.user.uid, source: .firebase)
         } catch {
-            let fallbackID = fallbackCustomerUserID()
-            Log.printLog(
-                l: .error,
-                str: "Firebase auth failed, using fallback_id: \(error.localizedDescription)"
-            )
-            return .init(userID: fallbackID, source: .fallback)
+            Log.printLog(l: .error, str: "Firebase auth failed: \(error.localizedDescription)")
+            return nil
         }
     }
 
+    /// Returns a locally generated ID, stable across launches, used only when Firebase auth
+    /// fails. Adapty cannot merge this profile into a later Firebase one, so avoid it unless
+    /// there is no alternative.
     private func fallbackCustomerUserID() -> String {
         let defaults = UserDefaults.standard
 
@@ -406,6 +479,11 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         return generatedID
     }
 
+    /// Applies the identity to every SDK except Adapty, which is identified at activation.
+    ///
+    /// Main-actor isolated because it publishes `_userID` to UI subscribers. Firebase's own
+    /// user ID is set only for a real Firebase identity, never for the local fallback.
+    @MainActor
     private func applyUserIdentity(_ identity: ResolvedUserIdentity) {
         if identity.source == .firebase {
             firebase.setUserID(identity.userID)
