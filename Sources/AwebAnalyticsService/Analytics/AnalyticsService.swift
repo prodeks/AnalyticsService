@@ -721,8 +721,9 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     ///   `PurchaseEvent.success` an additional `logPurchase(amount:currency:)` call is
     ///   made so Facebook can model purchase revenue.
     /// - AppsFlyer: `logEvent(_:withValues:)`.
-    /// - Mixpanel: all values are coerced to `String` via `String(describing:)` because
-    ///   Mixpanel's Swift API requires `[String: MixpanelType]`.
+    /// - Mixpanel: values are converted to `MixpanelType` while preserving `Int` /
+    ///   `Double` / `Bool` so Insights Average/Median/Percentile work. Unknown types
+    ///   fall back to `String(describing:)`.
     public func log(e: EventProtocol) {
         setupMixPanelIfNeeded()
         Log.printLog(l: .analytics, str: e.name + " \(e.params)")
@@ -746,8 +747,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
 
         appsflyer.logEvent(e.name, withValues: e.params)
 
-        let params = e.params.mapValues { String.init(describing: $0) }
-        Mixpanel.mainInstance().track(event: e.name, properties: params)
+        Mixpanel.mainInstance().track(event: e.name, properties: mixpanelProperties(from: e.params))
     }
 
     // MARK: - Consent
@@ -769,6 +769,30 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     /// [Adapty China cluster docs](https://adapty.io/docs/china-cluster?current-os=swift).
     private func adaptyServerClusterForCurrentUser() async -> AdaptyServerCluster {
         return await isRunningInChina ? .cn : .default
+    }
+
+    /// Converts event params to Mixpanel properties without stringifying numbers.
+    /// Mixpanel locks a property's type on first ingest; sending `height_cm` as
+    /// `"180"` would make Average/Median return empty forever.
+    private func mixpanelProperties(from params: [String: Any]) -> [String: MixpanelType] {
+        Dictionary(uniqueKeysWithValues: params.map { key, value in
+            (key, mixpanelValue(from: value))
+        })
+    }
+
+    private func mixpanelValue(from value: Any) -> MixpanelType {
+        switch value {
+        case let v as String: return v
+        case let v as Bool: return v
+        case let v as Int: return v
+        case let v as UInt: return v
+        case let v as Double: return v
+        case let v as Float: return v
+        case let v as Date: return v
+        case let v as URL: return v
+        case let v as NSNumber: return v
+        default: return String(describing: value)
+        }
     }
 }
 
