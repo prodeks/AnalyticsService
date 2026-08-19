@@ -448,15 +448,179 @@ public class PaywallCheckoutStartedEvent: PaywallEvent {
     }
 }
 
-/// Logged when the user cancels out of the payment sheet after tapping the purchase
-/// button (i.e. after `PaywallCheckoutStartedEvent` but before a purchase outcome).
-///
-/// Event name: `paywall_checkout_cancelled`
-public class PaywallCheckoutCancelledEvent: PaywallEvent {
-    public override var name: String {
-        "paywall_checkout_cancelled"
+    /// Logged when the user cancels out of the payment sheet after tapping the purchase
+    /// button (i.e. after `PaywallCheckoutStartedEvent` but before a purchase outcome).
+    ///
+    /// Event name: `paywall_checkout_cancelled`
+    public class PaywallCheckoutCancelledEvent: PaywallEvent {
+        public override var name: String {
+            "paywall_checkout_cancelled"
+        }
     }
-}
+
+    /// How `PayWall_Lifetime_button_tap` was triggered.
+    public enum PaywallLifetimeTapSource: String {
+        case optionSelect = "option_select"
+        case purchaseButton = "purchase_button"
+    }
+
+    /// Logged when the user selects Lifetime on a paywall (`option_select`) or taps
+    /// Subscribe with Lifetime already selected (`purchase_button`).
+    ///
+    /// Event name: `PayWall_Lifetime_button_tap`
+    public class PaywallLifetimeButtonTapEvent: PaywallEvent {
+        public let tapSource: PaywallLifetimeTapSource
+
+        public override var name: String { "PayWall_Lifetime_button_tap" }
+
+        public override var params: [String: Any] {
+            var result = super.params
+            result["tap_source"] = tapSource.rawValue
+            return result
+        }
+
+        public init(
+            paywallID: String,
+            placement: String? = nil,
+            productID: String,
+            variationId: String? = nil,
+            presentationID: String? = nil,
+            source: PaywallSource,
+            tapSource: PaywallLifetimeTapSource
+        ) {
+            self.tapSource = tapSource
+            super.init(
+                paywallID: paywallID,
+                placement: placement,
+                productID: productID,
+                variationId: variationId,
+                presentationID: presentationID,
+                source: source
+            )
+        }
+
+        public convenience init(
+            context: PaywallAnalyticsContext,
+            productID: String,
+            tapSource: PaywallLifetimeTapSource
+        ) {
+            self.init(
+                paywallID: context.paywallID,
+                placement: context.placementID,
+                productID: productID,
+                variationId: context.variationID,
+                presentationID: context.presentationID,
+                source: context.paywallSource,
+                tapSource: tapSource
+            )
+        }
+    }
+
+    /// Shared Lifetime-demand logging used by `PaywallController` and Adapty Builder paywalls.
+    public enum PaywallLifetimeAnalytics {
+        public static func logSelection(
+            _ iap: any IAPProtocol,
+            previous: (any IAPProtocol)?,
+            context: PaywallAnalyticsContext?,
+            log: ((EventProtocol) -> Void)?
+        ) {
+            logSelection(
+                productID: iap.productID,
+                isLifetime: iap.isLifetime,
+                previousWasLifetime: previous?.isLifetime ?? false,
+                context: context,
+                log: log
+            )
+        }
+
+        public static func logSelection(
+            productID: String,
+            previousProductID: String?,
+            context: PaywallAnalyticsContext?,
+            log: ((EventProtocol) -> Void)?
+        ) {
+            logSelection(
+                productID: productID,
+                isLifetime: productID.isLifetimeProductID,
+                previousWasLifetime: previousProductID?.isLifetimeProductID ?? false,
+                context: context,
+                log: log
+            )
+        }
+
+        public static func logCheckout(
+            _ iap: any IAPProtocol,
+            context: PaywallAnalyticsContext?,
+            log: ((EventProtocol) -> Void)?
+        ) {
+            logCheckout(
+                productID: iap.productID,
+                isLifetime: iap.isLifetime,
+                context: context,
+                log: log
+            )
+        }
+
+        public static func logCheckout(
+            productID: String,
+            context: PaywallAnalyticsContext?,
+            log: ((EventProtocol) -> Void)?
+        ) {
+            logCheckout(
+                productID: productID,
+                isLifetime: productID.isLifetimeProductID,
+                context: context,
+                log: log
+            )
+        }
+
+        private static func logSelection(
+            productID: String,
+            isLifetime: Bool,
+            previousWasLifetime: Bool,
+            context: PaywallAnalyticsContext?,
+            log: ((EventProtocol) -> Void)?
+        ) {
+            guard isLifetime, !previousWasLifetime, let log else { return }
+            emit(productID: productID, tapSource: .optionSelect, context: context, log: log)
+        }
+
+        private static func logCheckout(
+            productID: String,
+            isLifetime: Bool,
+            context: PaywallAnalyticsContext?,
+            log: ((EventProtocol) -> Void)?
+        ) {
+            guard isLifetime, let log else { return }
+            emit(productID: productID, tapSource: .purchaseButton, context: context, log: log)
+        }
+
+        private static func emit(
+            productID: String,
+            tapSource: PaywallLifetimeTapSource,
+            context: PaywallAnalyticsContext?,
+            log: (EventProtocol) -> Void
+        ) {
+            if let context {
+                log(
+                    PaywallLifetimeButtonTapEvent(
+                        context: context,
+                        productID: productID,
+                        tapSource: tapSource
+                    )
+                )
+            } else {
+                log(
+                    PaywallLifetimeButtonTapEvent(
+                        paywallID: "",
+                        productID: productID,
+                        source: .adapty,
+                        tapSource: tapSource
+                    )
+                )
+            }
+        }
+    }
 
 // MARK: - Failure events
 

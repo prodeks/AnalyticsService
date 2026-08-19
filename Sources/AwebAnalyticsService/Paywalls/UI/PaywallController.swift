@@ -120,8 +120,22 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
             }
         }
     }
+
+    public func didSelectProduct(_ iap: any IAPProtocol, previous: (any IAPProtocol)?) {
+        PaywallLifetimeAnalytics.logSelection(
+            iap,
+            previous: previous,
+            context: paywallAnalyticsContext,
+            log: logEvent
+        )
+    }
     
     public func purchase(_ iap: any IAPProtocol) {
+        PaywallLifetimeAnalytics.logCheckout(
+            iap,
+            context: paywallAnalyticsContext,
+            log: logEvent
+        )
         self.overlayView.isHidden = false
         if let product = adaptyPaywallData.products.first(where: { $0.vendorProductId == iap.productID }) {
             purchaseService.purchaseAdaptyProduct(

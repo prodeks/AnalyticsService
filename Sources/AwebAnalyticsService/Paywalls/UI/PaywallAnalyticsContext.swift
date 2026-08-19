@@ -50,4 +50,8 @@ public struct PaywallAnalyticsContext {
         }
         return result
     }
+
+    var paywallSource: PaywallSource {
+        purchaseService == PaywallSource.storeKit.analyticsValue ? .storeKit : .adapty
+    }
 }

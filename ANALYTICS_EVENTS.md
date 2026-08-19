@@ -22,6 +22,7 @@
 | `paywall_checkout_initiated` | Нажата кнопка покупки, до окна оплаты Apple |
 | `Paywall_Start_Button_tap` | Дублирующее событие для воронки |
 | `paywall_checkout_cancelled` | Пользователь закрыл окно оплаты |
+| `PayWall_Lifetime_button_tap` | Выбран Lifetime (`tap_source=option_select`) или нажат Subscribe при выбранном Lifetime (`purchase_button`) |
 
 ## Результат покупки
 
@@ -73,8 +74,9 @@
 | `variation_id` | ID варианта A/B-теста |
 | `presentation_id` | ID конкретного показа (для связи событий) |
 | `purchased` | Была ли покупка при закрытии экрана (да/нет) |
+| `tap_source` | Для `PayWall_Lifetime_button_tap`: `option_select` или `purchase_button` |
 
-Host-app tap events (e.g. `PayWall_Lifetime_button_tap`) should copy these keys from `PaywallViewDelegateProtocol.paywallAnalyticsContext.analyticsParams`. There is no `paywall_name` parameter — Adapty's paywall name is `paywall_id`.
+`PayWall_Lifetime_button_tap` is logged by `PaywallController` / Adapty Builder wrappers. Host custom paywalls call `didSelectProduct(_:previous:)`; `purchase(_:)` logs the checkout tap automatically. There is no `paywall_name` parameter — Adapty's paywall name is `paywall_id`.
 
 ### Параметры ошибок
 

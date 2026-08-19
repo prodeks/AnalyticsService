@@ -14,6 +14,7 @@ class AdaptyPaywallControllerWrapper: UIViewController, PaywallControllerProtoco
     let proxy: AdaptyPaywallControllerDelegateProxy
     private let presentationContext: PaywallPresentationContext
     private var didLogOpen = false
+    private var lastSelectedProductID: String?
 
     init(
         wrappedController: AdaptyPaywallController,
@@ -154,7 +155,14 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         _ controller: AdaptyPaywallController,
         didSelectProduct product: any AdaptyPaywallProductWithoutDeterminingOffer
     ) {
-        
+        let productID = product.vendorProductId
+        PaywallLifetimeAnalytics.logSelection(
+            productID: productID,
+            previousProductID: lastSelectedProductID,
+            context: PaywallAnalyticsContext(presentationContext),
+            log: analyticsService.log(e:)
+        )
+        lastSelectedProductID = productID
     }
     
     public func paywallController(
@@ -162,6 +170,11 @@ extension AdaptyPaywallControllerWrapper: AdaptyPaywallControllerDelegate {
         didStartPurchase product: AdaptyPaywallProduct
     ) {
         Log.printLog(l: .debug, str: #function)
+        PaywallLifetimeAnalytics.logCheckout(
+            productID: product.vendorProductId,
+            context: PaywallAnalyticsContext(presentationContext),
+            log: analyticsService.log(e:)
+        )
         PaywallEventLogger.checkoutStarted(
             checkoutContext(product: product),
             log: analyticsService.log(e:)
