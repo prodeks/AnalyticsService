@@ -791,6 +791,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         case let v as Date: return v
         case let v as URL: return v
         case let v as NSNumber: return v
+        case let v as [String]: return v
         default: return String(describing: value)
         }
     }
