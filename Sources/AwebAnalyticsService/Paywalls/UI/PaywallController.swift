@@ -9,6 +9,18 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
     public var navigated: ((PaywallPlacementProtocol) -> Void)?
     public var paywallScreenID: String? { paywallView.paywallID.rawValue }
 
+    public var paywallAnalyticsContext: PaywallAnalyticsContext? {
+        if let presentationContext {
+            return PaywallAnalyticsContext(presentationContext)
+        }
+        return PaywallAnalyticsContext(
+            paywallID: paywallView.paywallID.rawValue,
+            placementID: adaptyPaywallData.placement,
+            variationID: adaptyPaywallData.adaptyPaywall.variationId,
+            purchaseService: PaywallSource.adapty.analyticsValue
+        )
+    }
+
     private var presentationContext: PaywallPresentationContext?
     private var logEvent: ((EventProtocol) -> Void)?
     private var didLogOpen = false

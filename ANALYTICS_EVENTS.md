@@ -74,6 +74,8 @@
 | `presentation_id` | ID конкретного показа (для связи событий) |
 | `purchased` | Была ли покупка при закрытии экрана (да/нет) |
 
+Host-app tap events (e.g. `PayWall_Lifetime_button_tap`) should copy these keys from `PaywallViewDelegateProtocol.paywallAnalyticsContext.analyticsParams`. There is no `paywall_name` parameter — Adapty's paywall name is `paywall_id`.
+
 ### Параметры ошибок
 
 | Параметр | Описание |
