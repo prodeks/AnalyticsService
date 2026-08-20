@@ -8,7 +8,7 @@ public protocol PaywallViewDelegateProtocol: AnyObject {
     func privacyPolicyTap(_ item: URLConvertable)
     
     func dismiss()
-    func navigate(to placement: PaywallPlacementProtocol)
+    func navigate(to placement: any PaywallPlacementProtocol)
     
     func pricingData(_ iap: any IAPProtocol) -> PricingData?
 

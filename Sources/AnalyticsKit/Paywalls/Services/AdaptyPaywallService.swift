@@ -13,14 +13,14 @@ public protocol PaywallScreenProtocol: RawRepresentable where RawValue == String
 
 public protocol PaywallControllerProtocol: UIViewController {
     var dismissed: ((_ purchasedProductID: String?) -> Void)? { get set }
-    var navigated: ((PaywallPlacementProtocol) -> Void)? { get set }
+    var navigated: ((any PaywallPlacementProtocol) -> Void)? { get set }
     var paywallScreenID: String? { get }
 }
 
 @MainActor public protocol PaywallServiceProtocol: AnyObject {
     var placements: Set<String> { get set }
     var uiFactory: ((PaywallIdentifier) -> PaywallViewProtocol?)? { get set }
-    func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol?
+    func getPaywall(_ placement: any PaywallPlacementProtocol) -> PaywallControllerProtocol?
     func setFallbackPaywalls(url: URL)
 }
 
@@ -72,7 +72,7 @@ class AdaptyPaywallService: PaywallServiceProtocol {
         Adapty.setFallback(fileURL: url)
     }
     
-    public func getPaywall(_ placement: PaywallPlacementProtocol) -> PaywallControllerProtocol? {
+    public func getPaywall(_ placement: any PaywallPlacementProtocol) -> PaywallControllerProtocol? {
         Log.printLog(l: .debug, str: "Show paywall for placement: \(placement.identifier)")
         assert(uiFactory != nil)
         

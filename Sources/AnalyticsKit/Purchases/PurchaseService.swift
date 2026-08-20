@@ -18,7 +18,7 @@ import Adapty
 ///   product status and current entitlements. Adapty is still notified in the
 ///   background so that server-side analytics remain accurate, but access decisions
 ///   do not depend on Adapty being reachable.
-class PurchaseService: PurchaseServiceProtocol {
+class PurchaseService: @preconcurrency PurchaseServiceProtocol {
 
     // MARK: - Public properties
 

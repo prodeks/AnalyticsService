@@ -6,7 +6,7 @@ import Adapty
 public class PaywallController: UIViewController, PaywallViewDelegateProtocol, UIViewControllerTransitioningDelegate, PaywallControllerProtocol {
     
     public var dismissed: ((_ purchasedProductID: String?) -> Void)?
-    public var navigated: ((PaywallPlacementProtocol) -> Void)?
+    public var navigated: ((any PaywallPlacementProtocol) -> Void)?
     public var paywallScreenID: String? { paywallView.paywallID.rawValue }
 
     public var paywallAnalyticsContext: PaywallAnalyticsContext? {
@@ -192,7 +192,7 @@ public class PaywallController: UIViewController, PaywallViewDelegateProtocol, U
         presentPolicyItem(item)
     }
     
-    public func navigate(to placement: PaywallPlacementProtocol) {
+    public func navigate(to placement: any PaywallPlacementProtocol) {
         navigated?(placement)
     }
     

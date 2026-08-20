@@ -4,9 +4,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "AwebAnalyticsService",
+    name: "AnalyticsKit",
     platforms: [.iOS(.v16)],
-    products: [.library(name: "AwebAnalyticsService", targets: ["AwebAnalyticsService"])],
+    products: [.library(name: "AnalyticsKit", targets: ["AnalyticsKit"])],
     dependencies: [
         .package(url: "https://github.com/AppsFlyerSDK/AppsFlyerFramework-Dynamic", exact: .init(6, 15, 2)),
         .package(url: "https://github.com/facebook/facebook-ios-sdk", exact: Version(18, 0, 0)),
@@ -20,7 +20,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "AwebAnalyticsService",
+            name: "AnalyticsKit",
             dependencies: [
                 .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "FacebookCore", package: "facebook-ios-sdk"),

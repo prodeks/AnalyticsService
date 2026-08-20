@@ -363,7 +363,7 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
             .builder(withAPIKey: key)
             .with(logLevel: .verbose)
             .with(customerUserId: customerUserID)
-            .with(serverCluster: await adaptyServerClusterForCurrentUser())
+            .with(serverCluster: adaptyServerClusterForCurrentUser())
             .with(ipAddressCollectionDisabled: isRunningInChina)
             .build()
 
@@ -767,8 +767,8 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
     ///
     /// Chooses `.cn` when `isRunningInChina` is `true`, per the
     /// [Adapty China cluster docs](https://adapty.io/docs/china-cluster?current-os=swift).
-    private func adaptyServerClusterForCurrentUser() async -> AdaptyServerCluster {
-        return await isRunningInChina ? .cn : .default
+    private func adaptyServerClusterForCurrentUser() -> AdaptyServerCluster {
+        return isRunningInChina ? .cn : .default
     }
 
     /// Converts event params to Mixpanel properties without stringifying numbers.
