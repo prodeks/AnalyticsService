@@ -16,7 +16,10 @@ let package = Package(
         .package(url: "https://github.com/AppsFlyerSDK/PurchaseConnector-Dynamic", exact: .init(6, 15, 3)),
         .package(url: "https://github.com/mixpanel/mixpanel-swift.git", exact: .init(5, 0, 0)),
         .package(url: "https://github.com/adjust/ios_sdk", exact: .init(5, 5, 0)),
-        .package(url: "https://github.com/getsentry/sentry-cocoa.git", exact: .init(9, 16, 1))
+        .package(url: "https://github.com/getsentry/sentry-cocoa.git", exact: .init(9, 16, 1)),
+        .package(url: "https://github.com/apple/swift-algorithms.git", exact: .init(1, 2, 1)),
+        .package(url: "https://github.com/CombineCommunity/CombineExt", exact: .init(1, 9, 0)),
+        .package(url: "https://github.com/SnapKit/SnapKit.git", exact: .init(6, 0, 0))
     ],
     targets: [
         .target(
@@ -38,7 +41,10 @@ let package = Package(
                 .product(name: "AdaptyUI", package: "AdaptySDK-iOS"),
                 .product(name: "PurchaseConnector-Dynamic", package: "PurchaseConnector-Dynamic"),
                 .product(name: "Mixpanel", package: "mixpanel-swift"),
-                .product(name: "AdjustSdk", package: "ios_sdk")
+                .product(name: "AdjustSdk", package: "ios_sdk"),
+                .product(name: "Algorithms", package: "swift-algorithms"),
+                .product(name: "CombineExt", package: "CombineExt"),
+                .product(name: "SnapKit", package: "SnapKit")
             ]
         )
     ]

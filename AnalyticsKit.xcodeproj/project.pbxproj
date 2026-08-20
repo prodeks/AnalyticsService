@@ -18,6 +18,9 @@
 		6DF21395B1AFC4A34305D32D /* Adapty in Frameworks */ = {isa = PBXBuildFile; productRef = 413BA3C04A1D458F2ED6244B /* Adapty */; };
 		7CD0673A33E287D3ED4CFA8A /* AdjustSdk in Frameworks */ = {isa = PBXBuildFile; productRef = DA82D540C9B4A87DDC2A7D84 /* AdjustSdk */; };
 		81A2AFF6BAFA450307B5ECB0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 796618F1F46E172C7158A704 /* Lottie */; };
+		8459FCCB30373552004683A2 /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 8459FCCA30373552004683A2 /* Algorithms */; };
+		8459FCCE3037355B004683A2 /* CombineExt in Frameworks */ = {isa = PBXBuildFile; productRef = 8459FCCD3037355B004683A2 /* CombineExt */; };
+		8459FCDF30373614004683A2 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = 8459FCDE30373614004683A2 /* SnapKit */; };
 		8BD75BAC66C2BC1C13A4F48A /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = DE8CA58DB503486D07A78C40 /* FirebaseRemoteConfig */; };
 		9CDC4561A69ADEB3D298FA82 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 7D9D6B828D4CE129064CC7D1 /* FirebaseAuth */; };
 		BDD7840CC328D420131D9467 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = D9A6C9C211F9ABAD70CCF0F6 /* FirebaseAnalytics */; };
@@ -44,15 +47,18 @@
 				662ED9EA1EB15B57876559A5 /* Foundation.framework in Frameworks */,
 				CA38C904163DAEE0CAF0379D /* AppsFlyerLib-Dynamic in Frameworks */,
 				0878B1F4D86D11FF96DA25B6 /* FacebookCore in Frameworks */,
+				8459FCDF30373614004683A2 /* SnapKit in Frameworks */,
 				8BD75BAC66C2BC1C13A4F48A /* FirebaseRemoteConfig in Frameworks */,
 				0A8CA48D67CB8DB1762AF505 /* FirebaseFirestore in Frameworks */,
 				BDD7840CC328D420131D9467 /* FirebaseAnalytics in Frameworks */,
 				4D0060B1120F8A7B0D89534B /* FirebaseCrashlytics in Frameworks */,
 				9CDC4561A69ADEB3D298FA82 /* FirebaseAuth in Frameworks */,
+				8459FCCE3037355B004683A2 /* CombineExt in Frameworks */,
 				51BA86192B0058FA7F121FF8 /* FirebaseDatabase in Frameworks */,
 				4752C947A82683B83312484F /* FirebaseStorage in Frameworks */,
 				BF276531883584E6DA2A27D5 /* FirebaseMessaging in Frameworks */,
 				81A2AFF6BAFA450307B5ECB0 /* Lottie in Frameworks */,
+				8459FCCB30373552004683A2 /* Algorithms in Frameworks */,
 				6DF21395B1AFC4A34305D32D /* Adapty in Frameworks */,
 				DB6E1FCD526CC35ECC39D74B /* AdaptyUI in Frameworks */,
 				24E3E841EE7383080014DB90 /* PurchaseConnector-Dynamic in Frameworks */,
@@ -146,6 +152,9 @@
 				BD1E13AAE6E5DA979954E8F9 /* Mixpanel */,
 				DA82D540C9B4A87DDC2A7D84 /* AdjustSdk */,
 				02312EA79B8E4E17A77576C6 /* Sentry */,
+				8459FCCA30373552004683A2 /* Algorithms */,
+				8459FCCD3037355B004683A2 /* CombineExt */,
+				8459FCDE30373614004683A2 /* SnapKit */,
 			);
 			productName = AnalyticsKit;
 			productReference = 8D77F09E276EA27C1C567FB4 /* AnalyticsKit.framework */;
@@ -184,6 +193,9 @@
 				8D753B59F7209409D3DBACCC /* XCRemoteSwiftPackageReference "mixpanel-swift" */,
 				8C346363DAD79B035537C90A /* XCRemoteSwiftPackageReference "ios_sdk" */,
 				E74353A059764D7494F4A828 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
+				8459FCC930373552004683A2 /* XCRemoteSwiftPackageReference "swift-algorithms" */,
+				8459FCCC3037355B004683A2 /* XCRemoteSwiftPackageReference "CombineExt" */,
+				8459FCDD30373614004683A2 /* XCRemoteSwiftPackageReference "SnapKit" */,
 			);
 			productRefGroup = C0963DE9AC25296E27A700CB /* Products */;
 			projectDirPath = "";
@@ -470,6 +482,30 @@
 				version = 18.0.0;
 			};
 		};
+		8459FCC930373552004683A2 /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-algorithms.git";
+			requirement = {
+				kind = exactVersion;
+				version = 1.2.1;
+			};
+		};
+		8459FCCC3037355B004683A2 /* XCRemoteSwiftPackageReference "CombineExt" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CombineCommunity/CombineExt";
+			requirement = {
+				kind = exactVersion;
+				version = 1.9.0;
+			};
+		};
+		8459FCDD30373614004683A2 /* XCRemoteSwiftPackageReference "SnapKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SnapKit/SnapKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 6.0.0;
+			};
+		};
 		8C346363DAD79B035537C90A /* XCRemoteSwiftPackageReference "ios_sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/adjust/ios_sdk";
@@ -565,6 +601,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 2907EFB25D12DC543510C63E /* XCRemoteSwiftPackageReference "AppsFlyerFramework-Dynamic" */;
 			productName = "AppsFlyerLib-Dynamic";
+		};
+		8459FCCA30373552004683A2 /* Algorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8459FCC930373552004683A2 /* XCRemoteSwiftPackageReference "swift-algorithms" */;
+			productName = Algorithms;
+		};
+		8459FCCD3037355B004683A2 /* CombineExt */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8459FCCC3037355B004683A2 /* XCRemoteSwiftPackageReference "CombineExt" */;
+			productName = CombineExt;
+		};
+		8459FCDE30373614004683A2 /* SnapKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8459FCDD30373614004683A2 /* XCRemoteSwiftPackageReference "SnapKit" */;
+			productName = SnapKit;
 		};
 		8DEE0C9E6AD9EA8A794D851D /* AdaptyUI */ = {
 			isa = XCSwiftPackageProductDependency;

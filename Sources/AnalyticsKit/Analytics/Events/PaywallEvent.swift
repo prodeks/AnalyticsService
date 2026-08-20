@@ -1061,7 +1061,7 @@ struct AnalyticsErrorMetadata {
 /// Namespace for well-known `AnalyticsErrorMetadata` constants used when paywall
 /// presentation fails for reasons unrelated to a real underlying system error.
 ///
-/// All constants share the domain `"AwebAnalyticsService.Paywall"` and use negative
+/// All constants share the domain `"AnalyticsKit.Paywall"` and use negative
 /// error codes to avoid collisions with StoreKit / Adapty error codes.
 ///
 /// | Code | Meaning |
@@ -1075,7 +1075,7 @@ struct AnalyticsErrorMetadata {
 /// | -105 | `getPaywall(_:)` was called before `fetchProducts()` completed |
 enum PaywallAnalyticsError {
 
-    static let domain = "AwebAnalyticsService.Paywall"
+    static let domain = "AnalyticsKit.Paywall"
 
     static let missingProductIdentifiers   = AnalyticsErrorMetadata(reason: .missingProductIdentifiers, errorDomain: domain, errorCode: -1)
     static let invalidProductIdentifiers   = AnalyticsErrorMetadata(reason: .invalidProductIdentifiers, errorDomain: domain, errorCode: -2)
