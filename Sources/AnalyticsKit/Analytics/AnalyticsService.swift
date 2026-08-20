@@ -85,6 +85,19 @@ public protocol AnalyticsServiceProtocol: AnyObject {
     /// Additionally logs a Facebook purchase revenue event for `PurchaseEvent.success`.
     func log(e: EventProtocol)
 
+    /// Sets user-profile properties on Mixpanel People, Firebase Analytics, and Adapty.
+    ///
+    /// Mixpanel and Adapty keep native types (`Bool`, numeric); Firebase user properties
+    /// are always strings. Use this for current-state values that Insights cannot
+    /// dedupe from events (e.g. `current_bmi_state`).
+    func setUserProperties(_ properties: [String: Any])
+
+    /// Registers bundled Adapty paywall JSON used when placements cannot be fetched.
+    ///
+    /// Call once at launch with the app's `paywallFallback.json` URL, before paywalls
+    /// are requested. Adapty serves this file when the network is unavailable.
+    func setPaywallFallback(fileURL: URL)
+
     // MARK: Tracking
 
     /// Presents the ATT permission dialog and propagates the result to Adapty.
@@ -750,6 +763,40 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         Mixpanel.mainInstance().track(event: e.name, properties: mixpanelProperties(from: e.params))
     }
 
+    // MARK: - User properties
+
+    public func setUserProperties(_ properties: [String: Any]) {
+        guard !properties.isEmpty else { return }
+
+        setupMixPanelIfNeeded()
+
+        Mixpanel.mainInstance().people.set(properties: mixpanelProperties(from: properties))
+
+        for (name, value) in properties {
+            firebase.setUserProperty(firebaseUserPropertyValue(from: value), forName: name)
+        }
+
+        Task {
+            do {
+                var builder = AdaptyProfileParameters.Builder()
+                for (key, value) in properties {
+                    builder = try adaptyCustomAttribute(builder, key: key, value: value)
+                }
+                try await Adapty.updateProfile(params: builder.build())
+            } catch {
+                Log.printLog(
+                    l: .error,
+                    str: "Failed to update Adapty profile properties: \(error.localizedDescription)"
+                )
+                SentrySDK.capture(error: error)
+            }
+        }
+    }
+
+    public func setPaywallFallback(fileURL: URL) {
+        Adapty.setFallback(fileURL: fileURL)
+    }
+
     // MARK: - Consent
 
     public func updateRefundDataConsent(granted: Bool) async {
@@ -793,6 +840,42 @@ class AnalyticsService: NSObject, AnalyticsServiceProtocol {
         case let v as NSNumber: return v
         case let v as [String]: return v
         default: return String(describing: value)
+        }
+    }
+
+    private func firebaseUserPropertyValue(from value: Any) -> String {
+        switch value {
+        case let v as String:
+            return v
+        case let v as Double:
+            return String(format: "%g", v)
+        case let v as Float:
+            return String(format: "%g", v)
+        case let v as Bool:
+            return v ? "true" : "false"
+        default:
+            return String(describing: value)
+        }
+    }
+
+    private func adaptyCustomAttribute(
+        _ builder: AdaptyProfileParameters.Builder,
+        key: String,
+        value: Any
+    ) throws -> AdaptyProfileParameters.Builder {
+        switch value {
+        case let v as String:
+            return try builder.with(customAttribute: v, forKey: key)
+        case let v as Double:
+            return try builder.with(customAttribute: v, forKey: key)
+        case let v as Float:
+            return try builder.with(customAttribute: Double(v), forKey: key)
+        case let v as Int:
+            return try builder.with(customAttribute: Double(v), forKey: key)
+        case let v as Bool:
+            return try builder.with(customAttribute: v ? "true" : "false", forKey: key)
+        default:
+            return try builder.with(customAttribute: String(describing: value), forKey: key)
         }
     }
 }
